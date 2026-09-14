@@ -1,0 +1,11 @@
+build/
+install/
+log/
+.vscode/
+.agents/
+.codex/
+*.pyc
+*.npz
+*.onnx
+*.zip
+MUJOCO_LOG.TXT

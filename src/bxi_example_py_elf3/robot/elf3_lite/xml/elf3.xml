@@ -1,0 +1,460 @@
+<mujoco model="elf3">
+  <compiler angle="radian" meshdir="../meshes" autolimits="true"/>
+  <!-- <size njmax="500" nconmax="100" /> -->
+  <!-- <option timestep="0.002" iterations="50" solver="Newton" tolerance="1e-10"/> -->
+  
+  <default>
+    <default class="elf3">
+      <joint frictionloss="0.1" solimplimit="0.97 0.995 0.001" armature="0.01"/>
+      <default class="visual">
+        <geom group="2" type="mesh" density="0" material="silver" contype="0" conaffinity="0"/>
+      </default>
+      <default class="collision">
+        <geom group="3" rgba=".2 .6 .2 .3" type="capsule" contype="1" conaffinity="1"/>
+        <default class="foot_capsule">
+          <geom type="capsule" size="0.015"/>
+        </default>
+      </default>
+      <site group="5" rgba="1 0 0 1"/>
+    </default>
+  </default>
+
+  <!-- <option timestep="0.001" /> -->
+
+  <asset>
+    <material name="silver" rgba="0.7 0.7 0.7 1"/>
+    <material name="black" rgba="0.2 0.2 0.2 1"/>
+
+    <mesh name="torso_link" file="torso_link.STL"/>
+
+    <mesh name="waist_y_link" file="waist_y_link.STL"/>
+    <mesh name="waist_x_link" file="waist_x_link.STL"/>
+    <mesh name="waist_z_link" file="waist_z_link.STL"/>
+
+    <mesh name="l_hip_y_link" file="l_hip_y_link.STL"/>
+    <mesh name="l_hip_x_link" file="l_hip_x_link.STL"/>
+    <mesh name="l_hip_z_link" file="l_hip_z_link.STL"/>
+    <mesh name="l_knee_y_link" file="l_knee_y_link.STL"/>
+    <mesh name="l_ankle_y_link" file="l_ankle_y_link.STL"/>
+    <mesh name="l_ankle_x_link" file="l_ankle_x_link.STL"/>
+
+    <mesh name="r_hip_y_link" file="r_hip_y_link.STL"/>
+    <mesh name="r_hip_x_link" file="r_hip_x_link.STL"/>
+    <mesh name="r_hip_z_link" file="r_hip_z_link.STL"/>
+    <mesh name="r_knee_y_link" file="r_knee_y_link.STL"/>
+    <mesh name="r_ankle_y_link" file="r_ankle_y_link.STL"/>
+    <mesh name="r_ankle_x_link" file="r_ankle_x_link.STL"/>
+
+    <mesh name="l_shoulder_y_link" file="l_shoulder_y_link.STL"/>
+    <mesh name="l_shoulder_x_link" file="l_shoulder_x_link.STL"/>
+    <mesh name="l_shoulder_z_link" file="l_shoulder_z_link.STL"/>
+    <mesh name="l_elbow_y_link" file="l_elbow_y_link.STL"/>
+    <mesh name="l_wrist_x_link" file="l_wrist_x_link.STL"/>
+    <mesh name="l_wrist_y_link" file="l_wrist_y_link.STL"/>
+    <!-- <mesh name="l_wrist_z_link" file="l_wrist_z_link.STL"/> -->
+    <mesh name="l_wrist_z_link" file="l_hand.STL"/>
+
+    <mesh name="r_shoulder_y_link" file="r_shoulder_y_link.STL"/>
+    <mesh name="r_shoulder_x_link" file="r_shoulder_x_link.STL"/>
+    <mesh name="r_shoulder_z_link" file="r_shoulder_z_link.STL"/>
+    <mesh name="r_elbow_y_link" file="r_elbow_y_link.STL"/>
+    <mesh name="r_wrist_x_link" file="r_wrist_x_link.STL"/>
+    <mesh name="r_wrist_y_link" file="r_wrist_y_link.STL"/>
+    <!-- <mesh name="r_wrist_z_link" file="r_wrist_z_link.STL"/> -->
+    <mesh name="r_wrist_z_link" file="r_hand.STL"/>
+    <mesh name="head_z_link" file="head_z_link.STL"/>
+    <mesh name="head_y_link" file="head_y_link.STL"/>
+  </asset>
+  <worldbody>
+    <body name="torso_link" pos="0 0 1.1" childclass="elf3">
+      <inertial pos="0.00248104 -0.00011985 -0.0213511" mass="11.66386158" fullinertia="0.16938518 0.13849556 0.07231662 -0.00016255 0.00108159 -8.304e-05"/>
+      <camera name="tracking" pos="-2.5 0.0 1.1" euler="0 -1.04 -1.57" mode="trackcom"/>
+      <camera name="head_camera" mode="fixed" pos="-0.4 0 0.8" euler="0 -1.04 -1.57" fovy="90"/>
+      <camera name="depth_cam" pos="0.1152 0.0175 -0.1358" quat="0.9848078 0 -0.1736482 0" fovy="89.51" mode="fixed"/>
+      <joint name="world_joint" type="free"/>
+      <site name="imu_in_pelvis" size="0.01" pos="0.0 0 0.0"/>
+      <geom name="torso_collision" class="collision" size="0.09" fromto="0.0 0 -0.12 0.0 0 0.08"/>
+      <geom name="torso_2_collision" class="collision" size="0.08" fromto="0.0 -0.025 -0.12   0.0 0.025 -0.12"/>
+      <geom name="head_collision" class="collision" size="0.065" fromto="-0.01 0.00 0.30 0.02 0.00 0.30"/>
+      <geom class="visual" type="mesh" rgba="0.75294 0.75294 0.75294 1" mesh="torso_link"/>
+      <body name="waist_y_link" pos="0 0 -0.2265">
+        <inertial pos="0 0 0" mass="0.06620328" fullinertia="1.106e-05 1.847e-05 2.803e-05 0 0 0"/>
+        <joint name="waist_y_joint" pos="0 0 0" axis="0 1 0" range="-0.5236 0.5236" damping="5.0"/>
+        <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="waist_y_link"/>
+        <body name="waist_x_link">
+          <inertial pos="-0.00930435 0 -0.01487864" mass="0.24344947" fullinertia="0.0001527 0.00021777 0.00028814 0 2.968e-05 0"/>
+          <joint name="waist_x_joint" pos="0 0 0" axis="1 0 0" range="-0.2618 0.2618" damping="5.0"/>
+          <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="waist_x_link"/>
+          <body name="waist_z_link">
+            <inertial pos="0.00010085 -0.00035077 -0.12669367" mass="5.2693813" fullinertia="0.02160456 0.01703101 0.01459524 -0.0001496 -0.00010652 0.00016276"/>
+            <geom name="waist_z_1_collision" class="collision" size="0.055" fromto="0 -0.03 -0.156   0 0.03 -0.156"/>
+            <geom name="waist_z_2_collision" class="collision" size="0.055" fromto="0 0 -0.156   0 0 -0.05"/>
+            <joint name="waist_z_joint" pos="0 0 0" axis="0 0 1" range="-2.8798 2.8798" damping="5.0"/>
+            <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="waist_z_link"/>
+            <body name="l_hip_y_link" pos="0 0.136 -0.156">
+              <inertial pos="-0.02327137 -0.0044378 0.00220394" mass="1.74663835" fullinertia="0.00270621 0.00206302 0.00218919 8.023e-05 1.126e-05 5.888e-05"/>
+              <joint name="l_hip_y_joint" pos="0 0 0" axis="0 1 0" range="-2.8798 2.8798" damping="3.0"/>
+              <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="l_hip_y_link"/>
+              <body name="l_hip_x_link">
+                <inertial pos="0.01788252 0 -0.03683802" mass="0.23202193" fullinertia="0.00036995 0.00032959 0.00014279 0 -3.668e-05 0"/>
+                <geom name="l_hip_x_collision" class="collision" size="0.05" fromto="-0.035 0 0   0.0 0 0"/>
+                <joint name="l_hip_x_joint" pos="0 0 0" axis="1 0 0" range="-0.48869 3.0543" damping="3.0"/>
+                <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="l_hip_x_link"/>
+                <body name="l_hip_z_link">
+                  <inertial pos="0.00212894 -0.01021633 -0.23364887" mass="2.94332059" fullinertia="0.03095416 0.03161495 0.0035579 1.98e-06 0.00031793 -0.00246019"/>
+                  <geom name="l_hip_z_1_collision" class="collision" size="0.05" fromto="0.0 0 -0.12   0.0 0 -0.32"/>
+                  <geom name="l_hip_z_2_collision" class="collision" size="0.05" fromto="0.0 -0.025 -0.32   0.0 0 -0.32"/>
+                  <joint name="l_hip_z_joint" pos="0 0 0" axis="0 0 1" range="-2.8798 2.8798" damping="2.0"/>
+                  <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="l_hip_z_link"/>
+                  <body name="l_knee_y_link" pos="0 0 -0.32">
+                    <inertial pos="0.00668026 0.00374771 -0.14451634" mass="1.86991215" fullinertia="0.00964585 0.00972958 0.00144471 5.343e-05 -0.00023357 -0.00066056"/>
+                    <geom name="l_knee_y_collision" class="collision" size="0.05" fromto="0.0 0 -0.12   0.0 0 -0.26"/>
+                    <joint name="l_knee_y_joint" pos="0 0 0" axis="0 1 0" range="-0.087266 2.618" damping="2.0"/>
+                    <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="l_knee_y_link"/>
+                    <body name="l_ankle_y_link" pos="0 0 -0.32">
+                      <inertial pos="0 0 0" mass="0.01268984" fullinertia="1.31e-06 5.9e-07 1.55e-06 0 0 0"/>
+                      <joint name="l_ankle_y_joint" pos="0 0 0" axis="0 1 0" range="-0.87266 0.7854" damping="1.0"/>
+                      <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="l_ankle_y_link"/>
+                      <body name="l_ankle_x_link">
+                        <inertial pos="0.020935 0 -0.02438162" mass="0.37980156" fullinertia="0.00020999 0.00150042 0.00158777 0 7.03e-05 0"/>
+                        <site name="lf_tc" pos="0.05 0 -0.05" size="0.01"/>
+                        <geom name="l_foot1_collision" class="foot_capsule" fromto="0.12 -0.026 -0.025 -0.05 -0.027 -0.025"/>
+                        <geom name="l_foot2_collision" class="foot_capsule" fromto="-0.068 -0.018 -0.025 0.127 -0.018 -0.025"/>
+                        <geom name="l_foot3_collision" class="foot_capsule" fromto="-0.072 -0.01 -0.025 0.13 -0.01 -0.025"/>
+                        <geom name="l_foot4_collision" class="foot_capsule" fromto="-0.074 0 -0.025 0.132 0 -0.025"/>
+                        <geom name="l_foot5_collision" class="foot_capsule" fromto="-0.072 0.01 -0.025 0.13 0.01 -0.025"/>
+                        <geom name="l_foot6_collision" class="foot_capsule" fromto="-0.068 0.018 -0.025 0.127 0.018 -0.025"/>
+                        <geom name="l_foot7_collision" class="foot_capsule" fromto="0.12 0.026 -0.025 -0.05 0.026 -0.025"/>
+                        <joint name="l_ankle_x_joint" pos="0 0 0" axis="1 0 0" range="-0.34907 0.34907" damping="1.0"/>
+                        <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="l_ankle_x_link"/>
+                      </body>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+            
+            <!-- r Leg Chain -->
+            <body name="r_hip_y_link" pos="0 -0.136 -0.156">
+              <inertial pos="-0.02327137 0.00327913 0.00019704" mass="1.74663841" fullinertia="0.00273024 0.00207512 0.00220112 -9.182e-05 -8.82e-06 -7.27e-05"/>
+              <joint name="r_hip_y_joint" pos="0 0 0" axis="0 1 0" range="-2.8798 2.8798" damping="3.0"/>
+              <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="r_hip_y_link"/>
+              <body name="r_hip_x_link">
+                <inertial pos="0.01788252 0 -0.03683802" mass="0.23202193" fullinertia="0.00036995 0.00032959 0.00014279 0 -3.668e-05 0"/>
+                <geom name="r_hip_x_collision" class="collision" size="0.05" fromto="-0.035 0 0   0.0 0 0"/>
+                <joint name="r_hip_x_joint" pos="0 0 0" axis="1 0 0" range="-3.0543 0.48869" damping="3.0"/>
+                <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="r_hip_x_link"/>
+                <body name="r_hip_z_link">
+                  <inertial pos="0.00144137 0.00989203 -0.23483981" mass="2.94332069" fullinertia="0.03157825 0.03222338 0.00358063 2.026e-05 0.00014025 0.00261668"/>
+                  <geom name="r_hip_z_1_collision" class="collision" size="0.05" fromto="0.0 0 -0.12   0.0 0 -0.32"/>
+                  <geom name="r_hip_z_2_collision" class="collision" size="0.05" fromto="0.0 0.025 -0.32   0.0 0 -0.32"/>
+                  <joint name="r_hip_z_joint" pos="0 0 0" axis="0 0 1" range="-2.8798 2.8798" damping="2.0"/>
+                  <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="r_hip_z_link"/>
+                  <body name="r_knee_y_link" pos="0 0 -0.32">
+                    <inertial pos="0.00668027 -0.00326262 -0.14451644" mass="1.86991402" fullinertia="0.00965223 0.0097296 0.00145107 -6.279e-05 -0.00023357 0.00065665"/>
+                    <geom name="r_knee_y_collision" class="collision" size="0.05" fromto="0.0 0 -0.12   0.0 0 -0.26"/>
+                    <joint name="r_knee_y_joint" pos="0 0 0" axis="0 1 0" range="-0.087266 2.618" damping="2.0"/>
+                    <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="r_knee_y_link"/>
+                    <body name="r_ankle_y_link" pos="0 0 -0.32">
+                      <inertial pos="0 0 0" mass="0.01268984" fullinertia="1.31e-06 5.9e-07 1.55e-06 0 0 0"/>
+                      <joint name="r_ankle_y_joint" pos="0 0 0" axis="0 1 0" range="-0.87266 0.7854" damping="1.0"/>
+                      <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="r_ankle_y_link"/>
+                      <body name="r_ankle_x_link">
+                        <inertial pos="0.020935 0 -0.02438162" mass="0.37980156" fullinertia="0.00020999 0.00150042 0.00158777 0 7.03e-05 0"/>
+                        <site name="rf_tc" pos="0.05 0 -0.05" size="0.01"/>
+                        <geom name="r_foot1_collision" class="foot_capsule" fromto="0.12 -0.026 -0.025 -0.05 -0.027 -0.025"/>
+                        <geom name="r_foot2_collision" class="foot_capsule" fromto="-0.068 -0.018 -0.025 0.127 -0.018 -0.025"/>
+                        <geom name="r_foot3_collision" class="foot_capsule" fromto="-0.072 -0.01 -0.025 0.13 -0.01 -0.025"/>
+                        <geom name="r_foot4_collision" class="foot_capsule" fromto="-0.074 0 -0.025 0.132 0 -0.025"/>
+                        <geom name="r_foot5_collision" class="foot_capsule" fromto="-0.072 0.01 -0.025 0.13 0.01 -0.025"/>
+                        <geom name="r_foot6_collision" class="foot_capsule" fromto="-0.068 0.018 -0.025 0.127 0.018 -0.025"/>
+                        <geom name="r_foot7_collision" class="foot_capsule" fromto="0.12 0.026 -0.025 -0.05 0.026 -0.025"/>
+                        <joint name="r_ankle_x_joint" pos="0 0 0" axis="1 0 0" range="-0.34907 0.34907" damping="1.0"/>
+                        <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="r_ankle_x_link"/>
+                      </body>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+      
+      <!-- l Arm Chain -->
+      <body name="l_shoulder_y_link" pos="0 0.178 0.087">
+        <inertial pos="-0.0232938 -0.00424861 0.00174581" mass="0.99747353" fullinertia="0.00104473 0.00086991 0.00094265 5.318e-05 9.75e-06 1.522e-05"/>
+        <joint name="l_shoulder_y_joint" pos="0 0 0" axis="0 1 0" range="-2.8798 2.8798" damping="2.0"/>
+        <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="l_shoulder_y_link"/>
+        <body name="l_shoulder_x_link">
+          <inertial pos="0.01044987 0 -0.0265042" mass="0.13939414" fullinertia="0.00014319 0.00012285 6.653e-05 0 -1.777e-05 0"/>
+          <geom name="l_shoulder_x_collision" class="collision" size="0.04" fromto="-0.03 0 0   0.0 0 0"/>
+          <joint name="l_shoulder_x_joint" pos="0 0 0" axis="1 0 0" range="-0.34907 3.0543" damping="2.0"/>
+          <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="l_shoulder_x_link"/>
+          <body name="l_shoulder_z_link">
+            <inertial pos="-0.0014024 -0.00501388 -0.18798077" mass="1.67349896" fullinertia="0.01182993 0.01200646 0.00132122 1.325e-05 -6e-08 -0.00060488"/>
+            <geom name="l_shoulder_z_1_collision" class="collision" size="0.035" fromto="0 0 -0.08   0 0 -0.27"/>
+            <geom name="l_shoulder_z_2_collision" class="collision" size="0.04" fromto="0 -0.015 -0.256   0 0.01 -0.256"/>
+            <joint name="l_shoulder_z_joint" pos="0 0 0" axis="0 0 1" range="-2.8798 2.8798" damping="1.5"/>
+            <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="l_shoulder_z_link"/>
+            <body name="l_elbow_y_link" pos="0 0 -0.256">
+              <inertial pos="0.02791974 0.01785187 0" mass="0.1020615" fullinertia="4.729e-05 9.312e-05 9.347e-05 2.121e-05 0 0"/>
+              <geom name="l_elbow_y_collision" class="collision" size="0.04" fromto="0.08 0 0   0.2 0 0"/>
+              <joint name="l_elbow_y_joint" pos="0 0 0" axis="0 1 0" range="-0.95993 1.6581" damping="1.0"/>
+              <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="l_elbow_y_link"/>
+              <body name="l_wrist_x_link" pos="0.256 0 0">
+                <inertial pos="-0.1257212 -0.00125474 0" mass="1.24945755" fullinertia="0.00085066 0.00329725 0.00359642 3.2e-05 1.443e-05 5.4e-07"/>
+                <joint name="l_wrist_x_joint" pos="0 0 0" axis="1 0 0" range="-2.8798 2.8798" damping="0.5"/>
+                <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="l_wrist_x_link"/>
+                <body name="l_wrist_y_link">
+                  <inertial pos="0.00034025 4.93e-06 -0.00154873" mass="0.56828784" fullinertia="0.00032946 0.00032109 0.00031327 1.7e-07 5.7e-07 8.65e-06"/>
+                  <joint name="l_wrist_y_joint" pos="0 0 0" axis="0 1 0" range="-1.309 1.309" damping="0.5"/>
+                  <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="l_wrist_y_link"/>
+                  <body name="l_wrist_z_link">
+                    <inertial pos="0.03004397 0 0.01513885" mass="0.09977741" fullinertia="6.728e-05 8.372e-05 6.773e-05 0 2.438e-05 0"/>
+                    <joint name="l_wrist_z_joint" pos="0 0 0" axis="0 0 1" range="-0.7854 0.7854" damping="0.5"/>
+                    <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="l_wrist_z_link"/>
+                    <geom name="l_wrist_z_collision" class="collision" type="sphere" size="0.03" pos="0.04 0 0"/>
+                    <geom name="l_wrist_z_collision2" class="collision" type="sphere" size="0.05" pos="0.11 -0.01 0"/>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+      
+      <!-- r Arm Chain -->
+      <body name="r_shoulder_y_link" pos="0 -0.178 0.087">
+        <inertial pos="-0.0232938 0.00338182 0.00024448" mass="0.99747344" fullinertia="0.0010543 0.00087397 0.00094817 -5.724e-05 2.7e-06 -2.118e-05"/>
+        <joint name="r_shoulder_y_joint" pos="0 0 0" axis="0 1 0" range="-2.8798 2.8798" damping="2.0"/>
+        <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="r_shoulder_y_link"/>
+        <body name="r_shoulder_x_link">
+          <inertial pos="0.01044987 0 -0.0265042" mass="0.13939414" fullinertia="0.00014319 0.00012285 6.653e-05 0 -1.777e-05 0"/>
+          <geom name="r_shoulder_x_collision" class="collision" size="0.04" fromto="-0.03 0 0   0.0 0 0"/>
+          <joint name="r_shoulder_x_joint" pos="0 0 0" axis="1 0 0" range="-3.0543 0.34907" damping="2.0"/>
+          <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="r_shoulder_x_link"/>
+          <body name="r_shoulder_z_link">
+            <inertial pos="-0.0015394 0.00501389 -0.18708592" mass="1.67349843" fullinertia="0.01162379 0.01180073 0.00132162 -3.5e-06 -0.00012248 0.00059292"/>
+            <geom name="r_shoulder_z_1_collision" class="collision" size="0.035" fromto="0 0 -0.08   0 0 -0.27"/>
+            <geom name="r_shoulder_z_2_collision" class="collision" size="0.04" fromto="0 0.015 -0.256   0 -0.01 -0.256"/>
+            <joint name="r_shoulder_z_joint" pos="0 0 0" axis="0 0 1" range="-2.8798 2.8798" damping="1.5"/>
+            <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="r_shoulder_z_link"/>
+            <body name="r_elbow_y_link" pos="0 0 -0.256">
+              <inertial pos="0.02791974 -0.01785187 0" mass="0.1020615" fullinertia="4.729e-05 9.312e-05 9.347e-05 -2.121e-05 0 0"/>
+              <geom name="r_elbow_y_collision" class="collision" size="0.04" fromto="0.08 0 0   0.2 0 0"/>
+              <joint name="r_elbow_y_joint" pos="0 0 0" axis="0 1 0" range="-0.95993 1.6581" damping="1.0"/>
+              <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="r_elbow_y_link"/>
+              <body name="r_wrist_x_link" pos="0.256 0 0">
+                <inertial pos="-0.1252074 0.00074632 0" mass="1.24945755" fullinertia="0.00085193 0.00334022 0.00364065 -5.699e-05 1.477e-05 -2.3e-07"/>
+                <joint name="r_wrist_x_joint" pos="0 0 0" axis="1 0 0" range="-2.8798 2.8798" damping="0.5"/>
+                <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="r_wrist_x_link"/>
+                <body name="r_wrist_y_link">
+                  <inertial pos="0.00034019 -0.00112277 -0.00154873" mass="0.56828784" fullinertia="0.00032875 0.00032109 0.00031255 -5e-08 5.7e-07 -1.052e-05"/>
+                  <joint name="r_wrist_y_joint" pos="0 0 0" axis="0 1 0" range="-1.309 1.309" damping="0.5"/>
+                  <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="r_wrist_y_link"/>
+                  <body name="r_wrist_z_link">
+                    <inertial pos="0.03004397 0 0.01513885" mass="0.09977741" fullinertia="6.728e-05 8.372e-05 6.773e-05 0 2.438e-05 0"/>
+                    <joint name="r_wrist_z_joint" pos="0 0 0" axis="0 0 1" range="-0.7854 0.7854" damping="0.5"/>
+                    <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="r_wrist_z_link"/>
+                    <geom name="r_wrist_z_collision" class="collision" type="sphere" size="0.03" pos="0.04 0 0"/>
+                    <geom name="r_wrist_z_collision2" class="collision" type="sphere" size="0.05" pos="0.11 0.01 0"/>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="head_z_link" pos="0 0 0.2995">
+        <inertial pos="2.48e-06 -2.072e-05 -0.07141233" mass="0.37665142" fullinertia="0.00192005 0.00110511 0.00095156 -1.6e-07 1.7e-07 7e-08"/>
+        <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="head_z_link"/>
+        <body name="head_y_link">
+          <inertial pos="0.00693497 0.00114433 -0.00987703" mass="1.57425673" fullinertia="0.00294861 0.0032495 0.00265366 8.37e-06 0.00021043 -1.401e-05"/>
+          <geom class="visual" type="mesh" rgba="0.7529411765 0.7529411765 0.7529411765 1" mesh="head_y_link"/>
+          <body name="mid360_link" pos="0 0 -0.081" euler="3.1416 0 0"/>
+          <body name="d435i_link" pos="0.0628 0.0175 -0.048" euler="-1.5708 0 -1.5708"/>
+        </body>
+      </body>
+      <body name="torso_front_bottom_d435i_link" pos="0.1152 0.0175 -0.1358" euler="-2.7925 0 -1.5708"/>
+      <body name="imu_link"/>
+    </body>
+  </worldbody>
+
+  <contact>
+    <!-- <exclude body1="l_elbow_y_link" body2="l_wrist_y_link"/>
+    <exclude body1="r_elbow_y_link" body2="r_wrist_y_link"/>
+    <exclude body1="torso_link" body2="l_hip_x_link"/>
+    <exclude body1="torso_link" body2="r_hip_x_link"/> -->
+
+    <!-- l foot - floor -->
+    <pair name="l_foot1_floor" geom1="l_foot1_collision" geom2="floor" solref="0.01 1" friction="0.8 0.8"/>
+    <pair name="l_foot2_floor" geom1="l_foot2_collision" geom2="floor" solref="0.01 1" friction="0.8 0.8"/>
+    <pair name="l_foot3_floor" geom1="l_foot3_collision" geom2="floor" solref="0.01 1" friction="0.8 0.8"/>
+    <pair name="l_foot4_floor" geom1="l_foot4_collision" geom2="floor" solref="0.01 1" friction="0.8 0.8"/>
+    <pair name="l_foot5_floor" geom1="l_foot5_collision" geom2="floor" solref="0.01 1" friction="0.8 0.8"/>
+    <pair name="l_foot6_floor" geom1="l_foot6_collision" geom2="floor" solref="0.01 1" friction="0.8 0.8"/>
+    <pair name="l_foot7_floor" geom1="l_foot7_collision" geom2="floor" solref="0.01 1" friction="0.8 0.8"/>
+    <!-- r foot - floor -->
+    <pair name="r_foot1_floor" geom1="r_foot1_collision" geom2="floor" solref="0.01 1" friction="0.8 0.8"/>
+    <pair name="r_foot2_floor" geom1="r_foot2_collision" geom2="floor" solref="0.01 1" friction="0.8 0.8"/>
+    <pair name="r_foot3_floor" geom1="r_foot3_collision" geom2="floor" solref="0.01 1" friction="0.8 0.8"/>
+    <pair name="r_foot4_floor" geom1="r_foot4_collision" geom2="floor" solref="0.01 1" friction="0.8 0.8"/>
+    <pair name="r_foot5_floor" geom1="r_foot5_collision" geom2="floor" solref="0.01 1" friction="0.8 0.8"/>
+    <pair name="r_foot6_floor" geom1="r_foot6_collision" geom2="floor" solref="0.01 1" friction="0.8 0.8"/>
+    <pair name="r_foot7_floor" geom1="r_foot7_collision" geom2="floor" solref="0.01 1" friction="0.8 0.8"/>
+
+  </contact>
+
+  <actuator>
+    <motor name="waist_y_joint" joint="waist_y_joint" gear="1" ctrllimited='true' ctrlrange='-100 100'/>
+    <motor name="waist_x_joint" joint="waist_x_joint" gear="1" ctrllimited='true' ctrlrange='-100 100'/>
+    <motor name="waist_z_joint" joint="waist_z_joint" gear="1" ctrllimited='true' ctrlrange='-100 100'/>
+
+    <motor name="l_hip_y_joint" joint="l_hip_y_joint" gear="1" ctrllimited='true' ctrlrange='-100 100'/>
+    <motor name="l_hip_x_joint" joint="l_hip_x_joint" gear="1" ctrllimited='true' ctrlrange='-100 100'/>
+    <motor name="l_hip_z_joint" joint="l_hip_z_joint" gear="1" ctrllimited='true' ctrlrange='-50 50'/>
+    <motor name="l_knee_y_joint" joint="l_knee_y_joint" gear="1" ctrllimited='true' ctrlrange='-150 150'/>
+    <motor name="l_ankle_y_joint" joint="l_ankle_y_joint" gear="1" ctrllimited='true' ctrlrange='-50 50'/>
+    <motor name="l_ankle_x_joint" joint="l_ankle_x_joint" gear="1" ctrllimited='true' ctrlrange='-20 20'/>
+
+    <motor name="r_hip_y_joint" joint="r_hip_y_joint" gear="1" ctrllimited='true' ctrlrange='-100 100'/>
+    <motor name="r_hip_x_joint" joint="r_hip_x_joint" gear="1" ctrllimited='true' ctrlrange='-100 100'/>
+    <motor name="r_hip_z_joint" joint="r_hip_z_joint" gear="1" ctrllimited='true' ctrlrange='-50 50'/>
+    <motor name="r_knee_y_joint" joint="r_knee_y_joint" gear="1" ctrllimited='true' ctrlrange='-150 150'/>
+    <motor name="r_ankle_y_joint" joint="r_ankle_y_joint" gear="1" ctrllimited='true' ctrlrange='-50 50'/>
+    <motor name="r_ankle_x_joint" joint="r_ankle_x_joint" gear="1" ctrllimited='true' ctrlrange='-20 20'/>
+
+    <motor name="l_shoulder_y_joint" joint="l_shoulder_y_joint" gear="1" ctrllimited='true' ctrlrange='-50 50'/>
+    <motor name="l_shoulder_x_joint" joint="l_shoulder_x_joint" gear="1" ctrllimited='true' ctrlrange='-50 50'/>
+    <motor name="l_shoulder_z_joint" joint="l_shoulder_z_joint" gear="1" ctrllimited='true' ctrlrange='-25 25'/>
+    <motor name="l_elbow_y_joint" joint="l_elbow_y_joint" gear="1" ctrllimited='true' ctrlrange='-50 50'/>
+    <motor name="l_wrist_x_joint" joint="l_wrist_x_joint" gear="1" ctrllimited='true' ctrlrange='-25 25'/>
+    <motor name="l_wrist_y_joint" joint="l_wrist_y_joint" gear="1" ctrllimited='true' ctrlrange='-25 25'/>
+    <motor name="l_wrist_z_joint" joint="l_wrist_z_joint" gear="1" ctrllimited='true' ctrlrange='-25 25'/>
+
+    <motor name="r_shoulder_y_joint" joint="r_shoulder_y_joint" gear="1" ctrllimited='true' ctrlrange='-50 50'/>
+    <motor name="r_shoulder_x_joint" joint="r_shoulder_x_joint" gear="1" ctrllimited='true' ctrlrange='-50 50'/>
+    <motor name="r_shoulder_z_joint" joint="r_shoulder_z_joint" gear="1" ctrllimited='true' ctrlrange='-25 25'/>
+    <motor name="r_elbow_y_joint" joint="r_elbow_y_joint" gear="1" ctrllimited='true' ctrlrange='-50 50'/>
+    <motor name="r_wrist_x_joint" joint="r_wrist_x_joint" gear="1" ctrllimited='true' ctrlrange='-25 25'/>
+    <motor name="r_wrist_y_joint" joint="r_wrist_y_joint" gear="1" ctrllimited='true' ctrlrange='-25 25'/>
+    <motor name="r_wrist_z_joint" joint="r_wrist_z_joint" gear="1" ctrllimited='true' ctrlrange='-25 25'/>
+
+    <!-- <motor name="head_z_joint" joint="head_z_joint" gear="1" ctrllimited='true' ctrlrange='-25 25'/> -->
+    <!-- <motor name="head_y_joint" joint="head_y_joint" gear="1" ctrllimited='true' ctrlrange='-25 25'/> -->
+  </actuator>
+
+  <sensor>
+    <gyro name="Body_Gyro" site="imu_in_pelvis"/>
+    <framequat name="Body_Quat" objtype="site" objname="imu_in_pelvis"/>
+    <velocimeter name="imu_lin_vel" site="imu_in_pelvis"/>
+    <accelerometer name="Body_Acc" site="imu_in_pelvis"/>
+    <subtreeangmom name="root_angmom" body="torso_link"/>
+
+    <jointpos name="waist_y_joint_pos" joint="waist_y_joint" />
+    <jointpos name="waist_x_joint_pos" joint="waist_x_joint" />
+    <jointpos name="waist_z_joint_pos" joint="waist_z_joint" />
+
+    <jointpos name="l_hip_y_joint_pos" joint="l_hip_y_joint" />
+    <jointpos name="l_hip_x_joint_pos" joint="l_hip_x_joint" />
+    <jointpos name="l_hip_z_joint_pos" joint="l_hip_z_joint" />
+    <jointpos name="l_knee_y_joint_pos" joint="l_knee_y_joint" />
+    <jointpos name="l_ankle_y_joint_pos" joint="l_ankle_y_joint" />
+    <jointpos name="l_ankle_x_joint_pos" joint="l_ankle_x_joint" />
+
+    <jointpos name="r_hip_y_joint_pos" joint="r_hip_y_joint" />
+    <jointpos name="r_hip_x_joint_pos" joint="r_hip_x_joint" />
+    <jointpos name="r_hip_z_joint_pos" joint="r_hip_z_joint" />
+    <jointpos name="r_knee_y_joint_pos" joint="r_knee_y_joint" />
+    <jointpos name="r_ankle_y_joint_pos" joint="r_ankle_y_joint" />
+    <jointpos name="r_ankle_x_joint_pos" joint="r_ankle_x_joint" />
+
+    <jointpos name="l_shoulder_y_joint_pos" joint="l_shoulder_y_joint" />
+    <jointpos name="l_shoulder_x_joint_pos" joint="l_shoulder_x_joint" />
+    <jointpos name="l_shoulder_z_joint_pos" joint="l_shoulder_z_joint" />
+    <jointpos name="l_elbow_y_joint_pos" joint="l_elbow_y_joint" />
+    <jointpos name="l_wrist_x_joint_pos" joint="l_wrist_x_joint" />
+    <jointpos name="l_wrist_y_joint_pos" joint="l_wrist_y_joint" />
+    <jointpos name="l_wrist_z_joint_pos" joint="l_wrist_z_joint" />
+
+    <jointpos name="r_shoulder_y_joint_pos" joint="r_shoulder_y_joint" />
+    <jointpos name="r_shoulder_x_joint_pos" joint="r_shoulder_x_joint" />
+    <jointpos name="r_shoulder_z_joint_pos" joint="r_shoulder_z_joint" />
+    <jointpos name="r_elbow_y_joint_pos" joint="r_elbow_y_joint" />
+    <jointpos name="r_wrist_x_joint_pos" joint="r_wrist_x_joint" />
+    <jointpos name="r_wrist_y_joint_pos" joint="r_wrist_y_joint" />
+    <jointpos name="r_wrist_z_joint_pos" joint="r_wrist_z_joint" />
+
+    <!-- <jointpos name="head_z_joint_pos" joint="head_z_joint" /> -->
+    <!-- <jointpos name="head_y_joint_pos" joint="head_y_joint" /> -->
+
+     <!--  -->
+
+    <jointvel name="waist_y_joint_vel" joint="waist_y_joint" />
+    <jointvel name="waist_x_joint_vel" joint="waist_x_joint" />
+    <jointvel name="waist_z_joint_vel" joint="waist_z_joint" />
+
+    <jointvel name="l_hip_y_joint_vel" joint="l_hip_z_joint" />
+    <jointvel name="l_hip_x_joint_vel" joint="l_hip_x_joint" />
+    <jointvel name="l_hip_z_joint_vel" joint="l_hip_y_joint" />
+    <jointvel name="l_knee_y_joint_vel" joint="l_knee_y_joint" />
+    <jointvel name="l_ankle_y_joint_vel" joint="l_ankle_y_joint" />
+    <jointvel name="l_ankle_x_joint_vel" joint="l_ankle_x_joint" />
+
+    <jointvel name="r_hip_y_joint_vel" joint="r_hip_z_joint" />
+    <jointvel name="r_hip_x_joint_vel" joint="r_hip_x_joint" />
+    <jointvel name="r_hip_z_joint_vel" joint="r_hip_y_joint" />
+    <jointvel name="r_knee_y_joint_vel" joint="r_knee_y_joint" />
+    <jointvel name="r_ankle_y_joint_vel" joint="r_ankle_y_joint" />
+    <jointvel name="r_ankle_x_joint_vel" joint="r_ankle_x_joint" />
+
+    <jointvel name="l_shoulder_y_joint_vel" joint="l_shoulder_y_joint" />
+    <jointvel name="l_shoulder_x_joint_vel" joint="l_shoulder_x_joint" />
+    <jointvel name="l_shoulder_z_joint_vel" joint="l_shoulder_z_joint" />
+    <jointvel name="l_elbow_y_joint_vel" joint="l_elbow_y_joint" />
+    <jointvel name="l_wrist_x_joint_vel" joint="l_wrist_x_joint" />
+    <jointvel name="l_wrist_y_joint_vel" joint="l_wrist_y_joint" />
+    <jointvel name="l_wrist_z_joint_vel" joint="l_wrist_z_joint" />
+
+    <jointvel name="r_shoulder_y_joint_vel" joint="r_shoulder_y_joint" />
+    <jointvel name="r_shoulder_x_joint_vel" joint="r_shoulder_x_joint" />
+    <jointvel name="r_shoulder_z_joint_vel" joint="r_shoulder_z_joint" />
+    <jointvel name="r_elbow_y_joint_vel" joint="r_elbow_y_joint" />
+    <jointvel name="r_wrist_x_joint_vel" joint="r_wrist_x_joint" />
+    <jointvel name="r_wrist_y_joint_vel" joint="r_wrist_y_joint" />
+    <jointvel name="r_wrist_z_joint_vel" joint="r_wrist_z_joint" />
+    
+    <!-- <jointvel name="head_z_joint_vel" joint="head_z_joint" /> -->
+    <!-- <jointvel name="head_y_joint_vel" joint="head_y_joint" /> -->
+
+    <touch name="lf_touch" site="lf_tc" />
+    <touch name="rf_touch" site="rf_tc" />
+
+  </sensor>
+
+  <visual>
+    <!-- MuJoCo's default free camera faces the robot's front (+X direction). -->
+    <global azimuth="180" elevation="-10" fovy="45"/>
+    <headlight ambient="0.3 0.3 0.3" diffuse="0.3 0.3 0.3" specular="0 0 0"/>
+    <rgba haze="0.72 0.85 0.95 1"/>
+    <map fogstart="10" fogend="30" zfar="100" shadowclip="3"/>
+    <quality shadowsize="4096"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.18 0.48 0.85" rgb2="0.72 0.85 0.95" width="512" height="3072"/>
+    <texture type="2d" name="groundplane" file="../textures/leafy_grass.png"/>
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="0.5 0.5"
+              rgba="0.55 0.9 0.4 1" reflectance="0" specular="0" shininess="0"/>
+  </asset>
+
+  <worldbody>
+      <light name="sun" pos="-3 -4 8" dir="0.4 0.5 -1" directional="true"
+             ambient="0.15 0.15 0.12" diffuse="0.8 0.77 0.7" specular="0.2 0.2 0.2" castshadow="true"/>
+      <geom name="floor" size="0 0 0.01" type="plane" material="groundplane" />
+  </worldbody>
+
+  <!-- <include file="scene_bx.xml"/> -->
+  <!-- <include file="scene_bx2.xml"/> -->
+</mujoco>
