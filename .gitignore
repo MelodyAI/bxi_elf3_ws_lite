@@ -1,11 +1,14 @@
 build/
 install/
 log/
+cmu_1h_new/
+lafan1_npz/
+#*.npz
+#*.onnx
+
 .vscode/
 .agents/
 .codex/
 *.pyc
-*.npz
-*.onnx
 *.zip
 MUJOCO_LOG.TXT

@@ -47,7 +47,7 @@ ONNX_FILE_PATHS = {
     # "amp_run": "policy/myrun6.onnx",##sim 5.5=6
     "amp_run": "policy/myrun10.onnx",##hw 5=5.18
     # "amp_run": "policy/myrun14.onnx",#run_dwaq
-    "rgmt": "policy/rgmtr_119600.onnx",
+    "rgmt": "policy/rgmtr_123000.onnx",
     
     # isaaclab3
     "getup_face": "policy/dance_isaaclab/getup_face.onnx",
