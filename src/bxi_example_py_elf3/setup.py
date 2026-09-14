@@ -4,14 +4,25 @@ import os
 package_name = 'bxi_example_py_elf3'
 
 def get_policy_files():
+    """Return policy files using a path relative to this setup.py.
+
+    ``colcon`` normally runs setup.py from the package directory, but relying
+    on the process working directory makes manual builds (or other build
+    tools) silently skip the policy files.  Resolve only the source location
+    relative to setup.py; keep the install destination package-relative.
+    """
     data_files = []
-    source_dir = 'policy'  # 源目录，相对于setup.py的位置
+    setup_dir = os.path.dirname(os.path.abspath(__file__))
+    source_dir = os.path.join(setup_dir, 'policy')
     target_dir = os.path.join('share', package_name, 'policy')  # 目标目录
 
     # 遍历源目录下的所有文件和子目录
     for root, dirs, files in os.walk(source_dir):
         for file in files:
             file_path = os.path.join(root, file)
+            # ament_python 要求 data_files 的源文件路径必须是相对路径。
+            # 先按 setup.py 定位文件，再转换为相对于当前构建目录的路径。
+            file_path = os.path.relpath(file_path, os.getcwd())
             # 计算相对于源目录的相对路径，以保持子目录结构
             relative_path = os.path.relpath(root, source_dir)
             install_dir = os.path.join(target_dir, relative_path)
@@ -21,13 +32,15 @@ def get_policy_files():
 
 def get_robot_files():
     data_files = []
-    source_dir = 'robot'  # 源目录，相对于setup.py的位置
+    setup_dir = os.path.dirname(os.path.abspath(__file__))
+    source_dir = os.path.join(setup_dir, 'robot')
     target_dir = os.path.join('share', package_name, 'robot')  # 目标目录
 
     # 遍历源目录下的所有文件和子目录
     for root, dirs, files in os.walk(source_dir):
         for file in files:
             file_path = os.path.join(root, file)
+            file_path = os.path.relpath(file_path, os.getcwd())
             # 计算相对于源目录的相对路径，以保持子目录结构
             relative_path = os.path.relpath(root, source_dir)
             install_dir = os.path.join(target_dir, relative_path)
@@ -37,13 +50,15 @@ def get_robot_files():
 
 def get_launch_files():
     data_files = []
-    source_dir = 'launch'  # 源目录，相对于setup.py的位置
+    setup_dir = os.path.dirname(os.path.abspath(__file__))
+    source_dir = os.path.join(setup_dir, 'launch')
     target_dir = os.path.join('share', package_name, 'launch')  # 目标目录
 
     # 遍历源目录下的所有文件和子目录#可能索引不到launch,故修改名称为.launch.py后缀
     for root, dirs, files in os.walk(source_dir):
         for file in files:
             file_path = os.path.join(root, file)
+            file_path = os.path.relpath(file_path, os.getcwd())
             # 计算相对于源目录的相对路径，以保持子目录结构
             relative_path = os.path.relpath(root, source_dir)
             install_dir = os.path.join(target_dir, relative_path)
