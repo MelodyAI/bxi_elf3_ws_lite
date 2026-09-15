@@ -93,6 +93,31 @@ source install/setup.bash
 ros2 launch remote_controller remote_conroller_launch.py 
 ```
 
+## ACCAD neural retarget test
+
+The checked-in Transformer retargeter accepts a 20-frame history of 14 SMPL-X
+body transforms and predicts the current frame plus ten future robot frames.
+`NeuralRetargetRGMT` packs those predictions into the 21-frame reference window
+required by the live RGMT actor.  A smoke test using an ACCAD SMPL-X stage-II
+file is available with:
+
+The live adapter runs Transformer inference in a background thread by default;
+the 50 Hz control callback consumes the newest completed prediction and only
+runs the lightweight RGMT actor synchronously.
+
+To make the X button use this path in `example_dance.launch.py` and
+`example_dance_hw.launch.py`, set `RGMT_REFERENCE_MODE = "neural_retarget"`
+in `bxi_example_py_elf3/model_config.py`.  Leave it as `"npz"` to retain the
+original pre-retargeted RGMT motion.
+
+```bash
+source install/setup.bash
+python3 src/bxi_example_py_elf3/test_neural_retarget_accad.py \
+  src/bxi_example_py_elf3/policy/ACCAD/Male2MartialArtsExtended_c3d/Extended_1_stageii.npz \
+  --retarget-onnx install/bxi_example_py_elf3/share/bxi_example_py_elf3/policy/neural_retarget.onnx \
+  --rgmt-onnx install/bxi_example_py_elf3/share/bxi_example_py_elf3/policy/rgmtr_130000.onnx
+```
+
 ## sim2sim
 ```bash
 cd bxi_elf3_ws
@@ -119,3 +144,15 @@ ros2 launch bxi_example_py_elf3 example_dance_hw.launch.py
 
 ## 注意事项
 大尺寸机器人有一定的危险性，每一步操作之前一定仔细检查！所有控制程序必须经过仿真后才可上真机运行，有任何异常及时按停止按钮！
+
+
+cd /opt/apps/roboticsservice
+bash runService.sh
+
+cd ~/bxi/bxi_elf3_ws_lite
+
+PYTHONPATH=src/bxi_example_py_elf3 \
+/home/szz/anaconda3/envs/gmr/bin/python \
+-m bxi_example_py_elf3.pico_pose_sender \
+--endpoint 'tcp://*:28704' \
+--fps 50

@@ -3,6 +3,9 @@ install/
 log/
 cmu_1h_new/
 lafan1_npz/
+ACCAD/
+body_models/
+test/
 #*.npz
 #*.onnx
 

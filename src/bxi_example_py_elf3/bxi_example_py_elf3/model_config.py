@@ -7,47 +7,68 @@ from ament_index_python.packages import get_package_share_path
 
 PACKAGE_NAME = "bxi_example_py_elf3"
 
+# Change this one value to select the reference source used by the X key.
+# ``npz`` uses the existing retargeted RGMT motion; ``neural_retarget`` uses
+# the SMPL-X/ACCAD input and the Transformer adapter before RGMT.
+# RGMT_REFERENCE_MODE = "npz"
+# RGMT_REFERENCE_MODE = "neural_retarget"  # "npz", "neural_retarget", or "pico"
+RGMT_REFERENCE_MODE = "pico"
+PICO_POSE_ENDPOINT = "tcp://127.0.0.1:28704"
+PICO_ARM_VELOCITY = 3.0       # rad/s, shoulder/elbow/wrist reference and target
+PICO_ARM_ACCELERATION = 20.0 # rad/s²; lower-body targets are not filtered
+
 # Keep these paths relative to the installed package share directory.  Both
 # simulation and hardware launch files use the same dictionaries.
 NPZ_FILE_PATHS = {
+
+    #smplx
+    "smplx": "policy/ACCAD/Male2MartialArtsExtended_c3d/Form_1_stageii.npz",
+    # "smplx": "policy/ACCAD/amp/walk/pico_stageii.npz",
+    # "smplx": "policy/ACCAD/amp/walk/0007_Walking001_stageii.npz",
+    # "smplx": "policy/ACCAD/amp/run/0005_Jogging001_stageii.npz",
+
+    #lafan1
+    # "rgmt": "policy/lafan1_npz/ground1_subject1.npz",
+    # "rgmt": "policy/lafan1_npz/fight1_subject2.npz",
+    # "rgmt": "policy/lafan1_npz/aiming1_subject1.npz",
+    # "rgmt": "policy/lafan1_npz/multipleActions1_subject1.npz",
+    # "rgmt": "policy/lafan1_npz/fallAndGetUp1_subject4.npz",
+    # "rgmt": "policy/lafan1_npz/aiming1_subject1.npz",
+    # "rgmt": "policy/lafan1_npz/run1_subject2.npz",
+    # "rgmt": "policy/lafan1_npz/jumps1_subject2.npz",
+    # "rgmt": "policy/dance_isaaclab/pico_fix_fix_fix_final.npz",
+    # "rgmt": "policy/lafan1_npz/run1_subject5.npz",
+    # "rgmt": "policy/lafan1_npz/walk1_subject2.npz",
+    "rgmt": "policy/lafan1_npz/dance1_subject2.npz",
+    # "rgmt": "policy/lafan1_npz/walk1_subject5.npz",
+
+    #cmu
+    # "rgmt": "policy/cmu_1h_new/75/75_08_stageii.npz",    #360旋转
+    # "rgmt": "policy/cmu_1h_new/88/88_11_stageii.npz",    #热身
+    # "rgmt": "policy/cmu_1h_new/90/90_01_stageii.npz",    #后滚翻
+    # "rgmt": "policy/cmu_1h_new/90/90_02_stageii.npz",    #侧手翻
+    # "rgmt": "policy/cmu_1h_new/90/90_03_stageii.npz",    #侧手翻
+    # "rgmt": "policy/cmu_1h_new/90/90_04_stageii.npz",    #侧手翻
+    # "rgmt": "policy/cmu_1h_new/90/90_05_stageii.npz",    #回旋踢
+    # "rgmt": "policy/cmu_1h_new/90/90_06_stageii.npz",    #回旋踢
+    # "rgmt": "policy/cmu_1h_new/90/90_30_stageii.npz",
+    # "rgmt": "policy/cmu_1h_new/15/15_01_stageii.npz",
+    # "rgmt": "policy/cmu_1h_new/15/15_01_nur.npz",
+
     # isaaclab
     "lie_down": "policy/dance_isaaclab/lie_down.npz",
     "getup_face": "policy/dance_isaaclab/getup_face.npz",
     "getup_back": "policy/dance_isaaclab/getup_back.npz",
-    
-    # "lafan1": "policy/lafan1_npz/ground1_subject1.npz",
-    # "lafan1": "policy/lafan1_npz/fight1_subject2.npz",
-    # "lafan1": "policy/lafan1_npz/aiming1_subject1.npz",
-    # "lafan1": "policy/lafan1_npz/multipleActions1_subject1.npz",
-    # "lafan1": "policy/lafan1_npz/fallAndGetUp1_subject4.npz",
-    # "lafan1": "policy/lafan1_npz/aiming1_subject1.npz",
-    # "lafan1": "policy/lafan1_npz/run1_subject2.npz",
-    # "lafan1": "policy/lafan1_npz/jumps1_subject2.npz",
-    # "lafan1": "policy/dance_isaaclab/pico_fix_fix_fix_final.npz",
-    # "lafan1": "policy/lafan1_npz/run1_subject5.npz",
-    # "lafan1": "policy/lafan1_npz/walk1_subject2.npz",
-    "lafan1": "policy/lafan1_npz/dance1_subject2.npz",
-    # "lafan1": "policy/lafan1_npz/walk1_subject5.npz",
-    
-    # "cmu": "policy/cmu_1h_new/75/75_08_stageii.npz",    #360旋转
-    # "cmu": "policy/cmu_1h_new/88/88_11_stageii.npz",    #热身
-    # "cmu": "policy/cmu_1h_new/90/90_01_stageii.npz",    #后滚翻
-    # "cmu": "policy/cmu_1h_new/90/90_02_stageii.npz",    #侧手翻
-    # "cmu": "policy/cmu_1h_new/90/90_03_stageii.npz",    #侧手翻
-    # "cmu": "policy/cmu_1h_new/90/90_04_stageii.npz",    #侧手翻
-    # "cmu": "policy/cmu_1h_new/90/90_05_stageii.npz",    #回旋踢
-    # "cmu": "policy/cmu_1h_new/90/90_06_stageii.npz",    #回旋踢
-    # "cmu": "policy/cmu_1h_new/90/90_30_stageii.npz",
-    # "cmu": "policy/cmu_1h_new/15/15_01_stageii.npz",
-    # "cmu": "policy/cmu_1h_new/15/15_01_nur.npz",
 }
 
 ONNX_FILE_PATHS = {
+    "neural_retarget": "policy/neural_retarget.onnx",
     "amp_walk": "policy/amp_dwaq3.onnx",##symmetry
     # "amp_run": "policy/myrun6.onnx",##sim 5.5=6
     "amp_run": "policy/myrun10.onnx",##hw 5=5.18
     # "amp_run": "policy/myrun14.onnx",#run_dwaq
-    "rgmt": "policy/rgmtr_123000.onnx",
+    # "rgmt": "policy/rgmtr_123000.onnx",
+    "rgmt": "policy/rgmtr_130000.onnx",
     
     # isaaclab3
     "getup_face": "policy/dance_isaaclab/getup_face.onnx",

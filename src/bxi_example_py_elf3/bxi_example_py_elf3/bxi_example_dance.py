@@ -24,7 +24,10 @@ import numpy as np
 from threading import Lock
 from collections import deque
 
-from bxi_example_py_elf3.models.rgmt2 import RgmtExternalReferencePolicy
+from bxi_example_py_elf3.models.rgmt import RgmtExternalReferencePolicy
+from bxi_example_py_elf3.models.neural_rgmt import NeuralRetargetRGMT
+from bxi_example_py_elf3.models.accad_smplx import AccadSmplxMotion
+from bxi_example_py_elf3.models.pico_human_client import PicoHumanPoseClient
 from bxi_example_py_elf3.models.beyondmimic import DanceMotionPolicyGravityIsaaclabV3
 from bxi_example_py_elf3.models.amp import  HumanoidGaitPolicyLite
 from bxi_example_py_elf3.utils.tfs import get_gravity_orientation, quaternion_to_euler_array
@@ -88,6 +91,7 @@ class motionType:
     dance_lie_down = 4
     dance_getup_face = 5
     dance_getup_back = 6
+    rgmt_neural = 7
      
 
 class BxiExample(Node):
@@ -138,14 +142,46 @@ class BxiExample(Node):
         self.amp_run = HumanoidGaitPolicyLite(self.onnx_file_dict["amp_run"])
         self.amp_walk = HumanoidGaitPolicyLite(self.onnx_file_dict["amp_walk"])
         
-        self.rgmt = RgmtExternalReferencePolicy(
-            self.npz_file_dict["lafan1"],
-            # self.npz_file_dict["cmu"],
-            
-            self.onnx_file_dict["rgmt"],
-            reference_yaw_mode="initial",  # 实机推荐
-            # reference_yaw_mode="continuous",  #           
-        )
+        self.rgmt = None
+        self.neural_rgmt = None
+        self.pico_pose_client = None
+        self._pico_waiting_logged = False
+        self._pico_active_logged = False
+        self._pico_tracking_active = False
+        self._pico_blend_step = 0
+        self._pico_wait_target = None
+        self.smplx_motion = None
+        self.smplx_frame = 19
+        if self.rgmt_reference_mode == 'npz':
+            self.rgmt = RgmtExternalReferencePolicy(
+                self.npz_file_dict["rgmt"],
+                self.onnx_file_dict["rgmt"],
+                reference_yaw_mode="initial",  # 实机推荐
+                # reference_yaw_mode="continuous",
+            )
+        elif self.rgmt_reference_mode == 'neural_retarget':
+            self.neural_rgmt = NeuralRetargetRGMT(
+                self.onnx_file_dict["neural_retarget"],
+                self.onnx_file_dict["rgmt"],
+                reference_yaw_mode="initial",
+            )
+            self.smplx_motion = AccadSmplxMotion.from_npz(
+                self.npz_file_dict["smplx"]
+            )
+            print(
+                "RGMT reference mode: neural_retarget, "
+                f"SMPL-X frames={len(self.smplx_motion.body_positions_w)}"
+            )
+        else:
+            self.neural_rgmt = NeuralRetargetRGMT(
+                self.onnx_file_dict["neural_retarget"],
+                self.onnx_file_dict["rgmt"],
+                reference_yaw_mode="initial",
+                arm_target_velocity=self.pico_arm_velocity,
+                arm_target_acceleration=self.pico_arm_acceleration,
+            )
+            self.pico_pose_client = PicoHumanPoseClient(self.pico_pose_endpoint)
+            print(f"RGMT reference mode: pico, endpoint={self.pico_pose_endpoint}")
         
         # beyondmimic模型
         self.dance_getup_face = DanceMotionPolicyGravityIsaaclabV3(self.npz_file_dict["getup_face"], self.onnx_file_dict["getup_face"], start_frame=1, fixed_pos=False)#fixed policy
@@ -164,6 +200,63 @@ class BxiExample(Node):
             # inference_step 会将 timestep 饱和在 end_frame。到达末帧后继续
             # 运行策略以保留 proprio/action 历史，不再 end+1 -> end 回退。
             self.send_to_motor(self.target_dof_pos, self.rgmt.kps, self.rgmt.kds)
+
+        if self.motion_type == motionType.rgmt_neural:
+            if self.neural_rgmt is None or (self.smplx_motion is None and self.pico_pose_client is None):
+                raise RuntimeError("neural RGMT mode is not initialized")
+            if self.pico_pose_client is not None:
+                self.pico_pose_client.poll()
+                history = self.pico_pose_client.history()
+                if history is None or self.pico_pose_client.stale(timeout_s=0.25):
+                    if not self._pico_waiting_logged:
+                        print("PICO pose unavailable/stale; holding default standing pose")
+                        self._pico_waiting_logged = True
+                    if self._pico_tracking_active:
+                        self.neural_rgmt.reset()
+                    self._pico_tracking_active = False
+                    self._pico_active_logged = False
+                    self._pico_blend_step = 0
+                    self._pico_wait_balance(q, dq, quat, omega)
+                    return
+                self._pico_waiting_logged = False
+                body_pos, body_rot = history
+            else:
+                body_pos, body_rot = self.smplx_motion.history(self.smplx_frame)
+            self.target_dof_pos = self.neural_rgmt.inference_step(
+                q,
+                dq,
+                quat,
+                omega,
+                body_pos,
+                body_rot,
+                source_time_s=(self.pico_pose_client.last_timestamp_ns * 1e-9
+                               if self.pico_pose_client is not None else self.smplx_frame * self.dt),
+            )
+            if self.target_dof_pos is None:
+                self._pico_wait_balance(q, dq, quat, omega)
+                return
+            kp, kd = self.neural_rgmt.rgmt.kps, self.neural_rgmt.rgmt.kds
+            if self.pico_pose_client is not None:
+                self._pico_tracking_active = True
+                if not self._pico_active_logged:
+                    print("PICO canonical reference ready; blending into RGMT", flush=True)
+                    self._pico_active_logged = True
+                self._pico_blend_step += 1
+                alpha = min(1.0, self._pico_blend_step * self.dt / 0.6)
+                if self._pico_wait_target is not None and alpha < 1.0:
+                    self.target_dof_pos = (1-alpha)*self._pico_wait_target + alpha*self.target_dof_pos
+                    kp = (1-alpha)*self.amp_walk.kps + alpha*kp
+                    kd = (1-alpha)*self.amp_walk.kds + alpha*kd
+            self.send_to_motor(
+                self.target_dof_pos,
+                kp,
+                kd,
+            )
+            if self.smplx_motion is not None and self.dance_flag == 1:
+                self.smplx_frame = min(
+                    self.smplx_frame + 1,
+                    len(self.smplx_motion.body_positions_w) - 1,
+                )
         
         
         if self.motion_type == motionType.dance_getup_face:
@@ -227,6 +320,15 @@ class BxiExample(Node):
             self.target_dof_pos = self.amp_run.inference_step(q, dq, quat, omega, cmd_vel)
             self.send_to_motor(self.target_dof_pos, self.amp_run.kps, self.amp_run.kds)    
      
+    def _pico_wait_balance(self, q, dq, quat, omega):
+        # A fixed PD joint pose is not a balance controller. Continue running
+        # the locomotion policy with zero velocity until the reference is ready.
+        self.target_dof_pos = self.amp_walk.inference_step(
+            q, dq, quat, omega, np.zeros(3, dtype=np.float32)
+        )
+        self._pico_wait_target = self.target_dof_pos.copy()
+        self.send_to_motor(self.target_dof_pos, self.amp_walk.kps, self.amp_walk.kds)
+
     def joy_callback(self, msg):
         with self.lock_in:
             if self.motion_type == motionType.amp_walk:
@@ -294,9 +396,34 @@ class BxiExample(Node):
                         self.dance_flag = 0
                     if self.motion_type == motionType.amp_walk:
                         self.dance_flag = 1
-                        self.rgmt.timestep = self.rgmt.start_frame
-                        self.rgmt.timeinit = 0.0
-                        self.switch_to_motion(self.rgmt, motionType.rgmt, num=20)
+                        if self.rgmt_reference_mode in {'neural_retarget', 'pico'}:
+                            self.neural_rgmt.reset()
+                            self._pico_active_logged = False
+                            self._pico_tracking_active = False
+                            self._pico_blend_step = 0
+                            self._pico_wait_target = self.amp_walk.default_dof_pos.copy()
+                            if self.smplx_motion is not None:
+                                # Start after one 20-frame history window.
+                                self.smplx_frame = min(
+                                    19,
+                                    len(self.smplx_motion.body_positions_w) - 1,
+                                )
+                            previous_motion = self.motion_type
+                            self.motion_type = motionType.rgmt_neural
+                            if self.rgmt_reference_mode == 'pico':
+                                # No valid PICO frame may be available yet;
+                                # switch immediately to the safe standing
+                                # fallback instead of blending a stale motion.
+                                self.transition_active = False
+                                self.prev_motion_type = None
+                                self._blend_pending = False
+                            else:
+                                self.start_motion_transition(previous_motion)
+                            print("X: start neural_retarget -> RGMT tracking")
+                        else:
+                            self.rgmt.timestep = self.rgmt.start_frame
+                            self.rgmt.timeinit = 0.0
+                            self.switch_to_motion(self.rgmt, motionType.rgmt, num=20)
                        
                 elif self.motion_y_changed == 1:
                     # Y 键只在机器人跌倒时触发起身，并根据身体朝向选择策略。
@@ -593,6 +720,22 @@ class BxiExample(Node):
         onnx_file_json = self.get_parameter('/onnx_file_dict').value
         self.onnx_file_dict = json.loads(onnx_file_json)
 
+        self.declare_parameter('/rgmt_reference_mode', 'npz')
+        self.rgmt_reference_mode = str(
+            self.get_parameter('/rgmt_reference_mode').value
+        ).lower()
+        self.declare_parameter('/pico_pose_endpoint', 'tcp://127.0.0.1:28704')
+        self.pico_pose_endpoint = str(self.get_parameter('/pico_pose_endpoint').value)
+        self.declare_parameter('/pico_arm_velocity', 3.0)
+        self.declare_parameter('/pico_arm_acceleration', 20.0)
+        self.pico_arm_velocity = float(self.get_parameter('/pico_arm_velocity').value)
+        self.pico_arm_acceleration = float(self.get_parameter('/pico_arm_acceleration').value)
+        if self.rgmt_reference_mode not in {'npz', 'neural_retarget', 'pico'}:
+            raise ValueError(
+                "'/rgmt_reference_mode' must be 'npz', 'neural_retarget', or 'pico', "
+                f"got {self.rgmt_reference_mode!r}"
+            )
+
         # 模型切换过渡时长（秒），可在 launch 时配置；<=0 表示关闭混合
         # self.declare_parameter('/transition_time', 0.3)
         self.declare_parameter('/transition_time', 0.4)
@@ -705,6 +848,10 @@ def main(args=None):
         executor.spin()
     finally:
         executor.shutdown()
+        if node.neural_rgmt is not None:
+            node.neural_rgmt.close()
+        if node.pico_pose_client is not None:
+            node.pico_pose_client.close()
         node.destroy_node()
         
     rclpy.shutdown()

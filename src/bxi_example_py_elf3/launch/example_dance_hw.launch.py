@@ -6,7 +6,8 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 import json
 
-from bxi_example_py_elf3.model_config import get_model_file_dicts
+from bxi_example_py_elf3.model_config import RGMT_REFERENCE_MODE, PICO_POSE_ENDPOINT, get_model_file_dicts
+from bxi_example_py_elf3.model_config import PICO_ARM_VELOCITY, PICO_ARM_ACCELERATION
 
 def generate_launch_description():
 
@@ -35,6 +36,10 @@ def generate_launch_description():
                 parameters=[
                     {"/topic_prefix": "hardware/"},
                     {"/use_hardware": True},
+                    {"/rgmt_reference_mode": RGMT_REFERENCE_MODE},
+                    {"/pico_pose_endpoint": PICO_POSE_ENDPOINT},
+                    {"/pico_arm_velocity": PICO_ARM_VELOCITY},
+                    {"/pico_arm_acceleration": PICO_ARM_ACCELERATION},
                     {"/npz_file_dict": json.dumps(npz_file_dict)},
                     {"/onnx_file_dict": json.dumps(onnx_file_dict)},
                 ],
