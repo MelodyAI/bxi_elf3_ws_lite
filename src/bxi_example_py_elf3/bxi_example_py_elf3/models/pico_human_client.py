@@ -11,12 +11,10 @@ The receiver keeps the latest 20 frames required by neural_retarget.onnx.
 from __future__ import annotations
 
 from collections import deque
-import json
 import time
 
 import numpy as np
 from .pico_contract import decode_packet
-
 
 
 class PicoHumanPoseClient:
@@ -43,6 +41,11 @@ class PicoHumanPoseClient:
         import zmq
 
         received = 0
+        latest_timestamped = None
+        was_stale = self.stale()
+        if was_stale:
+            self._positions.clear()
+            self._rotations.clear()
         for _ in range(64):  # Bound work per control tick, even under a flood.
             try:
                 parts = self._socket.recv_multipart(flags=zmq.NOBLOCK)
@@ -58,17 +61,36 @@ class PicoHumanPoseClient:
                     self.last_error = str(error)
                 continue
             self.last_error = None
-            if self.stale():
-                self._positions.clear()
-                self._rotations.clear()
-            self._positions.append(positions)
-            self._rotations.append(rotations)
-            self.last_timestamp_ns = int(header.get("recv_ns", 0))
+            source_ns = int(header.get("recv_ns", 0))
             self.last_receive_ns = time.monotonic_ns()
+            if source_ns <= 0:
+                # Keep compatibility with old test/replay packets that do not
+                # carry a sender timestamp.
+                self._positions.append(positions); self._rotations.append(rotations)
+                self.last_timestamp_ns = time.monotonic_ns()
+            else:
+                # The sender and control loop are both nominally 50 Hz. Keep
+                # only the newest packet in this poll so transport bursts do
+                # not duplicate Transformer history entries.
+                latest_timestamped = (positions, rotations, source_ns)
             received += 1
             self._received_count += 1
             if self._received_count == 1 or self._received_count % 50 == 0:
                 print(f"PICO human frames received: {self._received_count}", flush=True)
+
+        if latest_timestamped is not None:
+            positions, rotations, _source_ns = latest_timestamped
+            self._positions.append(positions)
+            self._rotations.append(rotations)
+            # Use the local control-sample time for the Transformer timeline;
+            # the sender timestamp identifies packet freshness.
+            self.last_timestamp_ns = time.monotonic_ns()
+        elif received == 0 and self._positions and not self.stale():
+            # Hold the newest pose through a short transport gap while still
+            # advancing the fixed 50 Hz Transformer timeline.
+            self._positions.append(self._positions[-1].copy())
+            self._rotations.append(self._rotations[-1].copy())
+            self.last_timestamp_ns = time.monotonic_ns()
         return received
 
     def history(self) -> tuple[np.ndarray, np.ndarray] | None:

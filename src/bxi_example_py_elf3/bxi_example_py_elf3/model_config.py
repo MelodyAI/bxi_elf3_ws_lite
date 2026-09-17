@@ -14,18 +14,18 @@ PACKAGE_NAME = "bxi_example_py_elf3"
 # RGMT_REFERENCE_MODE = "neural_retarget"  # "npz", "neural_retarget", or "pico"
 RGMT_REFERENCE_MODE = "pico"
 PICO_POSE_ENDPOINT = "tcp://127.0.0.1:28704"
-PICO_ARM_VELOCITY = 3.0       # rad/s, shoulder/elbow/wrist reference and target
-PICO_ARM_ACCELERATION = 20.0 # rad/s²; lower-body targets are not filtered
 
 # Keep these paths relative to the installed package share directory.  Both
 # simulation and hardware launch files use the same dictionaries.
 NPZ_FILE_PATHS = {
 
     #smplx
-    "smplx": "policy/ACCAD/Male2MartialArtsExtended_c3d/Form_1_stageii.npz",
+    # "smplx": "policy/ACCAD/Male2MartialArtsExtended_c3d/Form_1_stageii.npz",
     # "smplx": "policy/ACCAD/amp/walk/pico_stageii.npz",
-    # "smplx": "policy/ACCAD/amp/walk/0007_Walking001_stageii.npz",
+    "smplx": "policy/ACCAD/amp/walk/0007_Walking001_stageii.npz",
     # "smplx": "policy/ACCAD/amp/run/0005_Jogging001_stageii.npz",
+    # "smplx": "policy/ACCAD/Male2MartialArtsKicks_c3d/G18-__push_kick_right_stageii.npz",
+    # "smplx": "policy/ACCAD/Female1General_c3d/A15_-_skip_to_stand_stageii.npz",
 
     #lafan1
     # "rgmt": "policy/lafan1_npz/ground1_subject1.npz",
@@ -39,12 +39,12 @@ NPZ_FILE_PATHS = {
     # "rgmt": "policy/dance_isaaclab/pico_fix_fix_fix_final.npz",
     # "rgmt": "policy/lafan1_npz/run1_subject5.npz",
     # "rgmt": "policy/lafan1_npz/walk1_subject2.npz",
-    "rgmt": "policy/lafan1_npz/dance1_subject2.npz",
+    # "rgmt": "policy/lafan1_npz/dance1_subject2.npz",
     # "rgmt": "policy/lafan1_npz/walk1_subject5.npz",
 
     #cmu
     # "rgmt": "policy/cmu_1h_new/75/75_08_stageii.npz",    #360旋转
-    # "rgmt": "policy/cmu_1h_new/88/88_11_stageii.npz",    #热身
+    "rgmt": "policy/cmu_1h_new/88/88_11_stageii.npz",    #热身
     # "rgmt": "policy/cmu_1h_new/90/90_01_stageii.npz",    #后滚翻
     # "rgmt": "policy/cmu_1h_new/90/90_02_stageii.npz",    #侧手翻
     # "rgmt": "policy/cmu_1h_new/90/90_03_stageii.npz",    #侧手翻
@@ -62,13 +62,15 @@ NPZ_FILE_PATHS = {
 }
 
 ONNX_FILE_PATHS = {
-    "neural_retarget": "policy/neural_retarget.onnx",
     "amp_walk": "policy/amp_dwaq3.onnx",##symmetry
     # "amp_run": "policy/myrun6.onnx",##sim 5.5=6
     "amp_run": "policy/myrun10.onnx",##hw 5=5.18
     # "amp_run": "policy/myrun14.onnx",#run_dwaq
-    # "rgmt": "policy/rgmtr_123000.onnx",
-    "rgmt": "policy/rgmtr_130000.onnx",
+    "rgmt": "policy/rgmtr_160600.onnx",
+    
+    # "neural_retarget": "policy/neural_retarget.onnx",
+    "neural_retarget": "policy/neural_retarget_fast.onnx",
+    
     
     # isaaclab3
     "getup_face": "policy/dance_isaaclab/getup_face.onnx",

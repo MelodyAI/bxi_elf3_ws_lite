@@ -146,13 +146,27 @@ ros2 launch bxi_example_py_elf3 example_dance_hw.launch.py
 大尺寸机器人有一定的危险性，每一步操作之前一定仔细检查！所有控制程序必须经过仿真后才可上真机运行，有任何异常及时按停止按钮！
 
 
+
+
+https://github.com/XR-Robotics/XRoboToolkit-Unity-Client/releases/download/v1.1.1/XRoboToolkit-PICO-1.1.1.apk
+
+https://github.com/XR-Robotics/XRoboToolkit-PC-Service/releases/download/v1.0.0/XRoboToolkit_PC_Service_1.0.0_ubuntu_22.04_amd64.deb
+
+sudo dpkg -i XRoboToolkit_PC_Service_1.0.0_ubuntu_22.04_amd64.deb
+
+pkill -f RoboticsServiceProcess
 cd /opt/apps/roboticsservice
 bash runService.sh
 
 cd ~/bxi/bxi_elf3_ws_lite
+PYTHONPATH=src/bxi_example_py_elf3 \
+/home/szz/anaconda3/envs/gmr/bin/python \
+-m bxi_example_py_elf3.pico_pose_sender \
+--endpoint 'tcp://*:28704' 
 
+# 如需临时使用 90 Hz，可显式覆盖默认值
 PYTHONPATH=src/bxi_example_py_elf3 \
 /home/szz/anaconda3/envs/gmr/bin/python \
 -m bxi_example_py_elf3.pico_pose_sender \
 --endpoint 'tcp://*:28704' \
---fps 50
+--fps 90

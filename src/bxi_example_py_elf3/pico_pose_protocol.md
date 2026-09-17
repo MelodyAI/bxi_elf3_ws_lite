@@ -69,21 +69,16 @@ The headless test uses ELF3 XML, AMP and RGMT at 50 Hz, with PD torques at
 raw XR coordinates and the canonical node order above. A bounded simulation
 test does not guarantee stability for every live pose.
 
-## Arm prediction continuity
+## Arm prediction
 
-Right-shoulder predictions can jump even when human shoulder rotations are
-continuous. ArmReferenceFilter filters the predicted center in source time and
-rolls out a continuous 11-frame horizon with matching velocity. ArmTargetFilter
-also limits the final arm target's velocity and acceleration. Legs and waist
-are unchanged; left and right use identical limits (right arm is never copied
-from left). This adds arm response lag compared with unfiltered tracking.
+The live PICO path does not apply arm velocity or acceleration filtering. The
+Transformer output is passed directly to the RGMT reference window and the
+RGMT target is passed directly to the controller. This avoids adding response
+lag; any arm discontinuity must therefore be handled at the PICO/Transformer
+input or model-output source rather than by a runtime slew limiter.
 
-`PICO_ARM_VELOCITY=3.0` rad/s and `PICO_ARM_ACCELERATION=20.0` rad/s² in
-`model_config.py` configure both launches. Bounds apply to targets, not guaranteed
-physical joint speed, and the startup crossfade is a separate transition.
-Async source gaps use the actual source timestamp; single-frame overlap is
-not blended across skipped source frames. Duplicate timestamps are not inferred
-again. Restart the controller after changing the filter; sender is unchanged.
+The standalone sender defaults to 50 Hz. Async source gaps use the local 50 Hz
+control-sample timeline; the sender timestamp is used only for packet freshness.
 
 ```bash
 PYTHONPATH=src/bxi_example_py_elf3 python3 -m pytest -q src/bxi_example_py_elf3/test/test_arm_continuity.py

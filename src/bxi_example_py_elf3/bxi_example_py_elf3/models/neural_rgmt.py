@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections import deque
 from threading import Condition, Thread
-from dataclasses import replace
 import time
 
 import numpy as np
@@ -18,7 +17,6 @@ from .neural_retarget import (
     rotation_6d_to_matrix,
 )
 from .rgmt import MUJOCO_TO_ISAAC_INDEX, RgmtExternalReferencePolicy
-from .arm_target_filter import ArmReferenceFilter, ArmTargetFilter
 
 
 class NeuralRetargetRGMT:
@@ -31,22 +29,26 @@ class NeuralRetargetRGMT:
     """
 
     def __init__(self, retarget_onnx_path: str, rgmt_onnx_path: str, **kwargs) -> None:
-        # Consume adapter-only parameters BEFORE forwarding actor kwargs.
-        legacy_slew = kwargs.pop("arm_target_slew_limit", None)
-        velocity = kwargs.pop("arm_target_velocity", 3.0 if legacy_slew is None else float(legacy_slew) * 50)
-        acceleration = kwargs.pop("arm_target_acceleration", 20.0)
-        self.arm_filter_enabled = bool(kwargs.pop("arm_filter_enabled", True))
-        self.arm_reference_filter_enabled = bool(kwargs.pop("arm_reference_filter_enabled", True))
-        self._reference_filter = ArmReferenceFilter(np.arange(15,29), velocity, acceleration)
-        self._output_joint_order = kwargs.get("output_joint_order", "mujoco")
-        self._robot_joint_order = kwargs.get("robot_joint_order", "mujoco")
-        arm_indices = np.arange(15, 29)
-        if self._output_joint_order == "isaac":
-            arm_indices = np.flatnonzero(MUJOCO_TO_ISAAC_INDEX >= 15)
-        self.arm_filter = ArmTargetFilter(arm_indices, velocity, acceleration)
+        # These names were accepted by older launches, but arm target and
+        # reference filtering is intentionally removed from the live path.
+        # Consume them here so stale launch parameters are not forwarded to
+        # the RGMT actor.
+        for name in (
+            "arm_target_slew_limit",
+            "arm_target_velocity",
+            "arm_target_acceleration",
+            "arm_filter_enabled",
+            "arm_reference_filter_enabled",
+            "output_joint_order",
+            "robot_joint_order",
+        ):
+            kwargs.pop(name, None)
         self.retargeter = NeuralRetargeter(
             retarget_onnx_path,
-            intra_op_threads=kwargs.pop("retarget_intra_op_threads", 4),
+            # Two threads have a tighter tail latency on the deployment CPU.
+            # Four threads occasionally cross the 20 ms control period and
+            # make the async result arrive one tick late.
+            intra_op_threads=kwargs.pop("retarget_intra_op_threads", 2),
         )
         self.overlap_blend = float(kwargs.pop("overlap_blend", 0.5))
         if not 0.0 <= self.overlap_blend <= 1.0:
@@ -62,7 +64,7 @@ class NeuralRetargetRGMT:
             reference_yaw_mode=kwargs.pop("reference_yaw_mode", "initial"),
             reference_joint_order="isaac",
             # The RGMT actor is small. One thread avoids contending with the
-            # four-thread Transformer inside the same 20 ms control period.
+            # two-thread Transformer inside the same 20 ms control period.
             intra_op_num_threads=kwargs.pop("intra_op_num_threads", 1),
             **kwargs,
         )
@@ -101,7 +103,6 @@ class NeuralRetargetRGMT:
         self._last_velocity = None
         self._last_prediction = None
         self._last_target = None
-        self.arm_filter.reset()
         self._last_source_time = None
         self._submitted_source_time = None
         self._reference_window = None
@@ -117,7 +118,6 @@ class NeuralRetargetRGMT:
                 self._worker_condition.notify_all()
         else:
             self.retargeter.reset()
-            self._reference_filter.reset()
         self.rgmt.reset()
 
     def _prepare_prediction(
@@ -146,11 +146,6 @@ class NeuralRetargetRGMT:
             previous_velocity=previous_velocity,
             dt_s=source_dt_s,
         )
-        if self.arm_reference_filter_enabled:
-            positions, velocities = self._reference_filter.window(
-                prediction.dof_position, prediction.dof_velocity, source_dt_s
-            )
-            prediction = replace(prediction, dof_position=positions, dof_velocity=velocities)
         return prediction
 
     def _worker_loop(self) -> None:
@@ -170,7 +165,6 @@ class NeuralRetargetRGMT:
                 if self._worker_stop:
                     return
                 if local_epoch != self._worker_epoch:
-                    self._reference_filter.reset()
                     previous_prediction = None
                     previous_position = None
                     previous_velocity = None
@@ -245,10 +239,6 @@ class NeuralRetargetRGMT:
         joint_velocity_isaac[-1] = (
             joint_position_isaac[-1] - joint_position_isaac[-2]
         ) * np.float32(50.0)
-        if self.arm_reference_filter_enabled:
-            # Reference filter velocity belongs to its smoothed trajectory.
-            arm_isaac = np.flatnonzero(MUJOCO_TO_ISAAC_INDEX >= 15)
-            joint_velocity_isaac[:, arm_isaac] = model_velocity_isaac[:, arm_isaac]
         matrices = rotation_6d_to_matrix(prediction.root_rotation_6d)
         root_quat = matrix_to_quaternion_wxyz(matrices)
         root_ang_vel_w = (
@@ -345,9 +335,6 @@ class NeuralRetargetRGMT:
             reference_root_ang_vel_window_w=np.stack([item[3] for item in window]),
         )
         self.last_raw_target = np.asarray(target, dtype=np.float32).copy()
-        if self.arm_filter_enabled:
-            measured = self.rgmt._from_isaac(self.rgmt._to_isaac(np.asarray(q), self._robot_joint_order), self._output_joint_order)
-            target = self.arm_filter.apply(target, measured, 0.02)
         self._last_target = target.copy()
         return target
 

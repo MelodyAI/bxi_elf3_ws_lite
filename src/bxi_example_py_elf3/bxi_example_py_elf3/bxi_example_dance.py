@@ -177,8 +177,6 @@ class BxiExample(Node):
                 self.onnx_file_dict["neural_retarget"],
                 self.onnx_file_dict["rgmt"],
                 reference_yaw_mode="initial",
-                arm_target_velocity=self.pico_arm_velocity,
-                arm_target_acceleration=self.pico_arm_acceleration,
             )
             self.pico_pose_client = PicoHumanPoseClient(self.pico_pose_endpoint)
             print(f"RGMT reference mode: pico, endpoint={self.pico_pose_endpoint}")
@@ -726,10 +724,6 @@ class BxiExample(Node):
         ).lower()
         self.declare_parameter('/pico_pose_endpoint', 'tcp://127.0.0.1:28704')
         self.pico_pose_endpoint = str(self.get_parameter('/pico_pose_endpoint').value)
-        self.declare_parameter('/pico_arm_velocity', 3.0)
-        self.declare_parameter('/pico_arm_acceleration', 20.0)
-        self.pico_arm_velocity = float(self.get_parameter('/pico_arm_velocity').value)
-        self.pico_arm_acceleration = float(self.get_parameter('/pico_arm_acceleration').value)
         if self.rgmt_reference_mode not in {'npz', 'neural_retarget', 'pico'}:
             raise ValueError(
                 "'/rgmt_reference_mode' must be 'npz', 'neural_retarget', or 'pico', "
