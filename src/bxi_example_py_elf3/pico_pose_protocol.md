@@ -57,6 +57,36 @@ Set `RGMT_REFERENCE_MODE = "pico"` in `model_config.py`, rebuild, and launch the
 ELF3 controller. The sender imports only `xrobotoolkit_sdk`; it does not import
 or execute GRIT. Restart both sender and controller after protocol updates.
 
+## Launch-managed PICO mode
+
+Set `RGMT_REFERENCE_MODE = "pico"` in
+`bxi_example_py_elf3/model_config.py`. The `example_dance.launch.py` and
+`example_dance_hw.launch.py` launch files then start the XRoboToolkit PC
+service and the in-package `pico_pose_sender` automatically. Both processes
+are stopped together with the ROS launch.
+
+The repository includes an x86_64/CPython-3.10 prebuilt PICO runtime under
+`third_party/pico` (the service subset and `xrobotoolkit_sdk` extension). The
+launch uses it by default, so no SDK build step or `/opt/apps` installation is
+needed on a matching Ubuntu 22.04 machine. The vendor service and Python
+extension are still binary assets; use the external paths below when replacing
+them:
+
+```python
+PICO_SERVICE_ROOT = "/opt/apps/roboticsservice"
+PICO_SENDER_PYTHON = "/path/to/python3"
+PICO_SENDER_ENDPOINT = "tcp://*:28704"
+PICO_USE_BUNDLED_RUNTIME = True
+```
+
+The bundled extension targets CPython 3.10 on x86_64. `PICO_SENDER_PYTHON`
+therefore needs to be a compatible Python and provide the ordinary runtime
+packages used by the sender (`numpy`, `scipy`, and `pyzmq`); the proprietary
+SDK itself is loaded from `third_party/pico`.
+Set `PICO_AUTO_START_SERVICE` or `PICO_AUTO_START_SENDER` to `False` when
+either process is already managed externally. The service startup delay is
+2 seconds by default and is controlled by `PICO_SERVICE_START_DELAY`.
+
 Regression checks (no hardware communication):
 
 ```bash

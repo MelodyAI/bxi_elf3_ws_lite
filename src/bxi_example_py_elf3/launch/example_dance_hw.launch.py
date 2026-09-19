@@ -7,13 +7,14 @@ from launch_ros.actions import Node
 import json
 
 from bxi_example_py_elf3.model_config import RGMT_REFERENCE_MODE, PICO_POSE_ENDPOINT, get_model_file_dicts
+from bxi_example_py_elf3.pico_launch import make_pico_launch_actions
 
 def generate_launch_description():
 
     npz_file_dict, onnx_file_dict = get_model_file_dicts()
 
-    return LaunchDescription(
-        [
+    actions = make_pico_launch_actions()
+    actions.extend([
             Node(
                 package="hardware_elf3",
                 executable="hardware_elf3",
@@ -43,5 +44,5 @@ def generate_launch_description():
                 emulate_tty=True,
                 arguments=[("__log_level:=debug")],
             ),
-        ]
-    )
+        ])
+    return LaunchDescription(actions)

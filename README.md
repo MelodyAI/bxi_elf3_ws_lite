@@ -134,6 +134,16 @@ source install/setup.bash
 ros2 launch bxi_example_py_elf3 example_dance_hw.launch.py
 ```
 
+### PICO launch mode
+
+Set `RGMT_REFERENCE_MODE = "pico"` in
+`src/bxi_example_py_elf3/bxi_example_py_elf3/model_config.py`.  The dance
+launch files then start the bundled x86_64/CPython-3.10 PICO runtime and the
+in-package sender automatically, and stop both when the launch exits.  The
+bundled runtime is under `src/bxi_example_py_elf3/third_party/pico`; configure
+`PICO_USE_BUNDLED_RUNTIME = False` plus `PICO_SERVICE_ROOT` only when using an
+external installation.
+
 
 ### 硬件保护
 硬件节点除了通信超时保护之外还带有扭矩保护，超速保护，位置保护
@@ -163,10 +173,3 @@ PYTHONPATH=src/bxi_example_py_elf3 \
 /home/szz/anaconda3/envs/gmr/bin/python \
 -m bxi_example_py_elf3.pico_pose_sender \
 --endpoint 'tcp://*:28704' 
-
-# 如需临时使用 90 Hz，可显式覆盖默认值
-PYTHONPATH=src/bxi_example_py_elf3 \
-/home/szz/anaconda3/envs/gmr/bin/python \
--m bxi_example_py_elf3.pico_pose_sender \
---endpoint 'tcp://*:28704' \
---fps 90

@@ -30,7 +30,7 @@ from bxi_example_py_elf3.models.accad_smplx import AccadSmplxMotion
 from bxi_example_py_elf3.models.pico_human_client import PicoHumanPoseClient
 from bxi_example_py_elf3.models.beyondmimic import DanceMotionPolicyGravityIsaaclabV3
 from bxi_example_py_elf3.models.amp import  HumanoidGaitPolicyLite
-from bxi_example_py_elf3.utils.tfs import get_gravity_orientation, quaternion_to_euler_array
+from bxi_example_py_elf3.utils.tfs import get_gravity_orientation
 
 robot_name = "elf3"
 
@@ -182,8 +182,11 @@ class BxiExample(Node):
             print(f"RGMT reference mode: pico, endpoint={self.pico_pose_endpoint}")
         
         # beyondmimic模型
+        self.dance_lie_down = DanceMotionPolicyGravityIsaaclabV3(self.npz_file_dict["lie_down"], self.onnx_file_dict["lie_down"], start_frame=160,fixed_pos=True)#fixed policy
         self.dance_getup_face = DanceMotionPolicyGravityIsaaclabV3(self.npz_file_dict["getup_face"], self.onnx_file_dict["getup_face"], start_frame=1, fixed_pos=False)#fixed policy
         self.dance_getup_back = DanceMotionPolicyGravityIsaaclabV3(self.npz_file_dict["getup_back"], self.onnx_file_dict["getup_back"], start_frame=1, fixed_pos=False)#fixed policy
+
+        self.dance_lie_down.end_frame = self.dance_lie_down.end_frame - 190
 
     def _run_motion_dispatch(self, q, dq, quat, omega, cmd_vel):
         """运行当前 self.motion_type 对应的推理分支（输出会经 send_to_motor 发布/捕获）。"""
@@ -256,23 +259,60 @@ class BxiExample(Node):
                     len(self.smplx_motion.body_positions_w) - 1,
                 )
         
-        
+        # 倒地后按 Y 的第一阶段：从当前实测关节位置缓慢移动到统一的
+        # 默认关节角，避免直接跳变到起身姿态。
+        if (
+            self._getup_ramp_active
+            and self.motion_type in (
+                motionType.dance_getup_face,
+                motionType.dance_getup_back,
+            )
+        ):
+            model = (
+                self.dance_getup_face
+                if self.motion_type == motionType.dance_getup_face
+                else self.dance_getup_back
+            )
+            self._getup_ramp_step += 1
+            alpha = min(
+                1.0,
+                self._getup_ramp_step / max(1, self._getup_ramp_total_steps),
+            )
+            self.target_dof_pos = (
+                (1.0 - alpha) * self._getup_ramp_start_pos
+                + alpha * self._getup_ramp_target_pos
+            )
+            self.send_to_motor(self.target_dof_pos, model.kps, model.kds)
+            if self._getup_ramp_step >= self._getup_ramp_total_steps:
+                self._getup_ramp_active = False
+                model.timestep = model.start_frame
+                model.timeinit = 0.0
+                print("Get-up ramp finished, starting motion replay.")
+            return
+
         if self.motion_type == motionType.dance_getup_face:
             if self.dance_getup_face.timestep <= self.dance_getup_face.end_frame:
                 self.target_dof_pos = self.dance_getup_face.inference_step(q, dq, quat, omega)
                 # 发布关节控制指令
                 self.send_to_motor(self.target_dof_pos, self.dance_getup_face.kps, self.dance_getup_face.kds)
 
-            # 动作管理    
+            # 动作管理
             if self.dance_flag==1:
                 # print("timestep:", self.dance_jojo.timestep)
                 self.dance_getup_face.timestep += 1
                 
-            # 动作结束检测    
+            # 动作结束检测
             if self.dance_getup_face.timestep > self.dance_getup_face.end_frame:
-                print("Motion replay finished, resetting simulation.")
-                # self.dance_getup_face.timestep = self.dance_getup_face.start_frame
-                self.motion_type = motionType.dance_walk
+                print("Get-up motion finished, switching to walking.")
+                # dance_walk 不是有效的 motionType；预热后直接切回 AMP 行走，
+                # 不再对已经结束的起身动作做二次过渡。
+                self.switch_to_motion(
+                    self.amp_walk,
+                    motionType.amp_walk,
+                    num=20,
+                    with_cmd_vel=True,
+                    transition_time=0.0,
+                )
                 
         if self.motion_type == motionType.dance_getup_back:
             if self.dance_getup_back.timestep <= self.dance_getup_back.end_frame:
@@ -280,33 +320,38 @@ class BxiExample(Node):
                 # 发布关节控制指令
                 self.send_to_motor(self.target_dof_pos, self.dance_getup_back.kps, self.dance_getup_back.kds)
 
-            # 动作管理    
+            # 动作管理
             if self.dance_flag==1:
                 # print("timestep:", self.dance_jojo.timestep)
                 self.dance_getup_back.timestep += 1
                 
-            # 动作结束检测    
+            # 动作结束检测
             if self.dance_getup_back.timestep > self.dance_getup_back.end_frame:
-                print("Motion replay finished, resetting simulation.")
-                # self.dance_getup_back.timestep = self.dance_getup_back.start_frame
-                self.motion_type = motionType.dance_walk
+                print("Get-up motion finished, switching to walking.")
+                # dance_walk 不是有效的 motionType；预热后直接切回 AMP 行走，
+                # 不再对已经结束的起身动作做二次过渡。
+                self.switch_to_motion(
+                    self.amp_walk,
+                    motionType.amp_walk,
+                    num=20,
+                    with_cmd_vel=True,
+                    transition_time=0.0,
+                )
                       
-        # if self.motion_type == motionType.dance_lie_down:
-        #     if self.dance_lie_down.timestep <= self.dance_lie_down.end_frame:
-        #         print(self.dance_lie_down.end_frame)
-        #         self.target_dof_pos = self.dance_lie_down.inference_step(q, dq, quat, omega)
-        #         # 发布关节控制指令
-        #         self.send_to_motor(self.target_dof_pos, self.dance_lie_down.kps, self.dance_lie_down.kds)
+        if self.motion_type == motionType.dance_lie_down:
+            if self.dance_lie_down.timestep <= self.dance_lie_down.end_frame:
+                self.target_dof_pos = self.dance_lie_down.inference_step(q, dq, quat, omega)
+                # 发布关节控制指令
+                self.send_to_motor(self.target_dof_pos, self.dance_lie_down.kps, self.dance_lie_down.kds)
                 
-        #         # 动作管理    
-        #     if self.dance_flag==1:
-        #         print("timestep:", self.dance_lie_down.timestep)
-        #         self.dance_lie_down.timestep += 1
+            # 动作管理
+            if self.dance_flag==1:
+                self.dance_lie_down.timestep += 1
                 
-        #     # 动作结束检测    
-        #     if self.dance_lie_down.timestep > self.dance_lie_down.end_frame:
-        #         self.dance_lie_down.timestep = self.dance_lie_down.end_frame #停止动作
-        #         # self.motion_type = motionType.amp_walk
+            # 动作结束检测
+            if self.dance_lie_down.timestep > self.dance_lie_down.end_frame:
+                # 躺下结束后保持末帧，等待再次按 Y 键触发起身。
+                self.dance_lie_down.timestep = self.dance_lie_down.end_frame
         
         if self.motion_type == motionType.amp_walk:
             # print("AMP walking...")
@@ -362,10 +407,24 @@ class BxiExample(Node):
                     return False
                 return False
 
-            self.motion_a_changed = _debounced(motion_a != self.motion_a_prev, '_motion_a_debounce_until')
-            self.motion_x_changed = _debounced(motion_x != self.motion_x_prev, '_motion_x_debounce_until')
-            self.motion_y_changed = _debounced(motion_y != self.motion_y_prev, '_motion_y_debounce_until')
-            self.motion_b_changed = _debounced(motion_b != self.motion_b_prev, '_motion_b_debounce_until')
+            # 只响应按下沿；如果把松开沿也当作触发，会在起身结束后
+            # 因 Y 键释放再次进入 lie_down。
+            self.motion_a_changed = _debounced(
+                motion_a and not self.motion_a_prev,
+                '_motion_a_debounce_until',
+            )
+            self.motion_x_changed = _debounced(
+                motion_x and not self.motion_x_prev,
+                '_motion_x_debounce_until',
+            )
+            self.motion_y_changed = _debounced(
+                motion_y and not self.motion_y_prev,
+                '_motion_y_debounce_until',
+            )
+            self.motion_b_changed = _debounced(
+                motion_b and not self.motion_b_prev,
+                '_motion_b_debounce_until',
+            )
             # print(f"Received motion command: A={motion_a} (changed: {self.motion_a_changed}), X={motion_x} (changed: {self.motion_x_changed}), Y={motion_y} (changed: {self.motion_y_changed}), B={motion_b} (changed: {self.motion_b_changed})")
             
             #按键状态保存
@@ -388,7 +447,6 @@ class BxiExample(Node):
                         self.motion_type = motionType.amp_walk
 
                 elif self.motion_x_changed == 1:
-                        
                     self.dance_flag += 1
                     if self.dance_flag > 1:
                         self.dance_flag = 0
@@ -424,7 +482,7 @@ class BxiExample(Node):
                             self.switch_to_motion(self.rgmt, motionType.rgmt, num=20)
                        
                 elif self.motion_y_changed == 1:
-                    # Y 键只在机器人跌倒时触发起身，并根据身体朝向选择策略。
+                    # Y 键在站立时执行躺下，躺倒时根据身体朝向选择起身策略。
                     self.select_fall_getup_motion()
                     
 
@@ -436,6 +494,17 @@ class BxiExample(Node):
         dof_pos_target = np.asarray(dof_pos_target, dtype=np.float32)
         kps = np.asarray(kps, dtype=np.float32)
         kds = np.asarray(kds, dtype=np.float32)
+
+        # 跌倒保护锁存期间仍发送通信心跳，避免电机节点超时；但不再
+        # 发送走路模型的目标和增益。使用当前实测关节位置、零 kp/kd，
+        # 使保护状态不主动驱动倒地后的机器人。按 Y 起身后解除锁存。
+        if self.fall_protection_latched:
+            hold_pos = np.asarray(self.qpos, dtype=np.float32).reshape(-1)
+            if hold_pos.shape != dof_pos_target.shape or not np.all(np.isfinite(hold_pos)):
+                hold_pos = np.zeros_like(dof_pos_target)
+            dof_pos_target = hold_pos
+            kps = np.zeros_like(kps)
+            kds = np.zeros_like(kds)
 
         # 切换过渡阶段：捕获旧模型输出，跳过实际发布
         if self._capture_motor:
@@ -552,9 +621,28 @@ class BxiExample(Node):
                 omega = self.omega
                 cmd_vel = np.array([self.vx, self.vy, self.dyaw])
 
-            #获取欧拉角
-            eu_ang = quaternion_to_euler_array(quat)
-            eu_ang[eu_ang > math.pi] -= 2 * math.pi
+            # 只对 AMP 走路/跑步模型启用跌倒锁存。躺下和起身动作由
+            # Y 键流程管理，不能在这些动作期间被保护逻辑打断。
+            walk_motion = self.motion_type in (
+                motionType.amp_walk,
+                motionType.amp_run,
+            )
+            quat_valid = bool(np.all(np.isfinite(quat)) and np.linalg.norm(quat) > 0.5)
+            gravity_body = get_gravity_orientation(quat) if quat_valid else None
+            fallen = (
+                quat_valid
+                and abs(float(gravity_body[2])) < math.cos(math.pi / 2.5)
+            )
+            if walk_motion and fallen and not self.fall_protection_latched:
+                self.fall_protection_latched = True
+                self.transition_active = False
+                self.prev_motion_type = None
+                self._old_action = None
+                self._blend_pending = False
+                print(
+                    "Fall protection latched: motion output stopped, "
+                    "heartbeat active; press Y to get up."
+                )
                             
             # 状态机
             if self.state==robotState.stand:
@@ -567,16 +655,6 @@ class BxiExample(Node):
 
 
             elif self.state==robotState.motion:
-                #跌到检测
-                if (np.abs(eu_ang[1]) > (math.pi/2.5)) or (np.abs(eu_ang[2]) > (math.pi/2.5)):
-                    # print("robot tumble!")
-                    if self.use_hardware:
-                        # os._exit() #急杀真机
-                        pass
-                    else:
-                        # self.state = robotState.tumble
-                        pass
-                    
                 # --- 模型切换平滑过渡（双模型加权） ---
                 if self.transition_active and self.prev_motion_type is not None \
                         and self.prev_motion_type != self.motion_type:
@@ -623,6 +701,12 @@ class BxiExample(Node):
             return
         duration = self.transition_duration if transition_time is None else float(transition_time)
         if duration <= 0:
+            # 显式关闭过渡时必须清理旧过渡状态；否则上一次起身/躺下
+            # 的 transition_active 可能继续把动作切换逻辑卡住。
+            self.transition_active = False
+            self.prev_motion_type = None
+            self._old_action = None
+            self._blend_pending = False
             return
         self.transition_total_steps = max(1, int(round(duration / self.dt)))
         self.transition_step_count = 0
@@ -662,39 +746,96 @@ class BxiExample(Node):
             else:
                 model.inference_step(q, dq, quat, omega)
 
+    def _start_getup_ramp(self, model, motion):
+        """启动倒地后的关节缓启动，先到达模型默认关节角。"""
+        q = np.asarray(self.qpos, dtype=np.float32).reshape(-1).copy()
+
+        model.timestep = model.start_frame
+        model.timeinit = 0.0
+        if hasattr(model, "action_buffer"):
+            model.action_buffer.fill(0.0)
+        if hasattr(model, "history_buffers"):
+            model.history_buffers.clear()
+        default_target = getattr(model, "default_dof_pos", None)
+        if default_target is None:
+            raise AttributeError("get-up model must provide default_dof_pos")
+        default_target = np.asarray(default_target, dtype=np.float32).reshape(-1)
+        if q.shape != default_target.shape or not np.all(np.isfinite(q)):
+            q = default_target.copy()
+
+        self.motion_type = motion
+        self.dance_flag = 1
+        self.fall_protection_latched = False
+        self.transition_active = False
+        self.prev_motion_type = None
+        self._old_action = None
+        self._blend_pending = False
+        self._getup_ramp_start_pos = q
+        self._getup_ramp_target_pos = default_target.copy()
+        self._getup_ramp_step = 0
+        self._getup_ramp_total_steps = max(1, int(round(1.0 / self.dt)))
+        self._getup_ramp_active = True
+        print(
+            f"Get-up ramp started: {self._getup_ramp_total_steps} steps "
+            f"({self._getup_ramp_total_steps * self.dt:.2f}s)."
+        )
+
     def select_fall_getup_motion(self):
-        """Y 键触发起身：跌倒才执行，并按重力方向选择正面/背面策略。
+        """Y 键在站立/躺倒之间切换动作。
 
         ``get_gravity_orientation`` 返回机体坐标系中的重力方向；站立时
         z 分量接近 -1，躺倒时 z 分量接近 0。x 分量的符号沿用原工程
         的约定：x < 0 表示正面朝上，反之表示背面朝上。
         """
         gravity_body = get_gravity_orientation(self.quat.copy())
+        fall_latched = self.fall_protection_latched
 
-        # 与状态机中的跌倒阈值（约 72 度）保持一致，避免站立时误触发。
-        fallen = abs(float(gravity_body[2])) < math.cos(math.pi / 2.5)
-        if not fallen:
-            print(
-                "Y ignored: robot is not fallen "
-                f"(gravity_body={np.round(gravity_body, 3).tolist()})"
-            )
+        # 动作状态优先于瞬时 IMU 姿态：躺下动作完成后机器人可能仍有
+        # 一定倾角，单靠 gravity_body[2] 会偶尔把它误判为站立，再次
+        # 按 Y 就会重新播放 lie_down。
+        if fall_latched:
+            # 跌倒保护已经确认机器人倒地，Y 直接选择起身，不再依赖
+            # 此刻可能不稳定的 IMU z 分量。
+            fallen = True
+        elif self.motion_type == motionType.dance_lie_down:
+            fallen = True
+        elif self.motion_type in (
+            motionType.dance_getup_face,
+            motionType.dance_getup_back,
+        ):
+            print("Y ignored: get-up motion is still running")
             return False
+        else:
+            # 与状态机中的跌倒阈值（约 72 度）保持一致，避免站立时误触发。
+            fallen = abs(float(gravity_body[2])) < math.cos(math.pi / 2.5)
 
         self.dance_flag = 1
-        if gravity_body[0] < 0.0:
-            model = self.dance_getup_face
-            motion = motionType.dance_getup_face
-            getup_name = "face up"
+        if not fallen:
+            model = self.dance_lie_down
+            motion = motionType.dance_lie_down
+            getup_name = "lie down"
         else:
-            model = self.dance_getup_back
-            motion = motionType.dance_getup_back
-            getup_name = "back up"
+            if gravity_body[0] < 0.0:
+                model = self.dance_getup_face
+                motion = motionType.dance_getup_face
+                getup_name = "face up"
+            else:
+                model = self.dance_getup_back
+                motion = motionType.dance_getup_back
+                getup_name = "back up"
 
         model.timestep = model.start_frame
         model.timeinit = 0.0
-        self.switch_to_motion(model, motion, num=20)
+        if motion in (motionType.dance_getup_face, motionType.dance_getup_back):
+            if fallen:
+                self._start_getup_ramp(model, motion)
+            else:
+                self.fall_protection_latched = False
+                self.switch_to_motion(model, motion, num=20)
+        else:
+            self.switch_to_motion(model, motion, num=20)
         print(
-            f"fall getup: {getup_name}, gravity_body="
+            f"Y motion: {getup_name}, gravity_body="
             f"{np.round(gravity_body, 3).tolist()}"
         )
         return True
@@ -808,6 +949,15 @@ class BxiExample(Node):
         self._captured = None
         self._old_action = None
         self._blend_pending = False
+
+        # 跌倒保护：走路/跑步时一旦检测到倒地就锁存，停止发布电机指令，
+        # 只有 Y 键触发起身后才解除。
+        self.fall_protection_latched = False
+        self._getup_ramp_active = False
+        self._getup_ramp_step = 0
+        self._getup_ramp_total_steps = 0
+        self._getup_ramp_start_pos = None
+        self._getup_ramp_target_pos = None
 
     def imu_callback(self, msg):
         quat = msg.orientation

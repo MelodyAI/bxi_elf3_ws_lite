@@ -66,6 +66,23 @@ def get_launch_files():
     
     return data_files
 
+def get_third_party_files():
+    """Install bundled optional runtime assets under the package share path."""
+    data_files = []
+    setup_dir = os.path.dirname(os.path.abspath(__file__))
+    source_dir = os.path.join(setup_dir, 'third_party')
+    target_dir = os.path.join('share', package_name, 'third_party')
+    for root, dirs, files in os.walk(source_dir):
+        for file in files:
+            file_path = os.path.relpath(
+                os.path.join(root, file),
+                os.getcwd(),
+            )
+            relative_path = os.path.relpath(root, source_dir)
+            install_dir = os.path.join(target_dir, relative_path)
+            data_files.append((install_dir, [file_path]))
+    return data_files
+
 setup(
     name=package_name,
     version='0.0.0',
@@ -76,7 +93,7 @@ setup(
     data_files=[
         ('share/ament_index/resource_index/packages',['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-    ] + get_policy_files() + get_robot_files() + get_launch_files(),
+    ] + get_policy_files() + get_robot_files() + get_launch_files() + get_third_party_files(),
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='qiusuoxiaoshen',
