@@ -166,7 +166,8 @@ class BxiExample(Node):
                 reference_yaw_mode="initial",
             )
             self.smplx_motion = AccadSmplxMotion.from_npz(
-                self.npz_file_dict["smplx"]
+                self.npz_file_dict["smplx"],
+                body_model_path=self.npz_file_dict.get("smplx_model"),
             )
             print(
                 "RGMT reference mode: neural_retarget, "

@@ -27,7 +27,6 @@ def generate_launch_description():
                     {"simulation/model_file": xml_file},
                 ],
                 emulate_tty=True,
-                arguments=[("__log_level:=debug")],
             ),
 
             Node(
@@ -44,7 +43,6 @@ def generate_launch_description():
                     {"/onnx_file_dict": json.dumps(onnx_file_dict)},
                 ],
                 emulate_tty=True,
-                arguments=[("__log_level:=debug")],
             ),
         ])
     return LaunchDescription(actions)

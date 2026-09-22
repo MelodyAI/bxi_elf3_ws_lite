@@ -26,7 +26,6 @@ def generate_launch_description():
                     {"hardware_config/motor_disable": 0x60000000}, #motor disable head
                 ],
                 emulate_tty=True,
-                arguments=[("__log_level:=debug")],
             ),
             Node(
                 package="bxi_example_py_elf3",
@@ -42,7 +41,6 @@ def generate_launch_description():
                     {"/onnx_file_dict": json.dumps(onnx_file_dict)},
                 ],
                 emulate_tty=True,
-                arguments=[("__log_level:=debug")],
             ),
         ])
     return LaunchDescription(actions)

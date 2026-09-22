@@ -1,10 +1,11 @@
-"""Small, dependency-light SMPL-X/ACCAD motion adapter.
+"""Small, dependency-light SMPL/SMPL-X motion adapter.
 
 ACCAD stage-II files contain SMPL-X axis-angle poses rather than the
 ``body_pos_w/body_quat_w`` arrays consumed by RGMT.  This module performs the
 body-only forward kinematics needed by the neural retargeter.  Hand, face and
 finger joints are intentionally ignored because the deployed transformer
-contract uses fourteen body nodes.
+contract uses fourteen body nodes. CMU files are also accepted when they use
+the standard ``trans/mocap_framerate/poses`` SMPL layout.
 """
 
 from __future__ import annotations
@@ -66,6 +67,43 @@ def matrix_to_quaternion_wxyz(matrices: np.ndarray) -> np.ndarray:
     return wxyz.reshape(values.shape[:-2] + (4,)).astype(np.float32)
 
 
+def official_smplx_body_offsets(
+    model_path: str | Path,
+    betas: np.ndarray | None = None,
+) -> np.ndarray:
+    """Load shaped SMPL-X body offsets from the official model NPZ.
+
+    Only the official joint regressor and shape blend shapes are needed for
+    the kinematic body chain; vertices and pose blend shapes stay out of the
+    runtime path. This keeps the neural-retarget deployment NumPy/SciPy-only.
+    """
+    model_path = Path(model_path).expanduser().resolve()
+    with np.load(model_path, allow_pickle=True) as model:
+        for key in ("J_regressor", "v_template", "shapedirs"):
+            if key not in model:
+                raise KeyError(f"official SMPL-X model is missing {key!r}")
+        regressor = np.asarray(model["J_regressor"], dtype=np.float32)
+        vertices = np.asarray(model["v_template"], dtype=np.float32)
+        shapedirs = np.asarray(model["shapedirs"], dtype=np.float32)
+        if regressor.shape[0] < SMPLX_BODY_COUNT or regressor.shape[1] != vertices.shape[0]:
+            raise ValueError("official SMPL-X joint regressor has an incompatible shape")
+        beta_count = min(shapedirs.shape[-1], 16)
+        beta_values = np.zeros(beta_count, dtype=np.float32)
+        if betas is not None:
+            supplied = np.asarray(betas, dtype=np.float32).reshape(-1)
+            beta_values[:min(beta_count, supplied.size)] = supplied[:beta_count]
+        shaped_vertices = vertices + np.einsum(
+            "vci,i->vc", shapedirs[..., :beta_count], beta_values
+        )
+        joints = np.einsum("jv,vc->jc", regressor[:SMPLX_BODY_COUNT], shaped_vertices)
+
+    offsets = np.zeros((SMPLX_BODY_COUNT, 3), dtype=np.float32)
+    offsets[0] = joints[0]
+    for joint in range(1, SMPLX_BODY_COUNT):
+        offsets[joint] = joints[joint] - joints[int(BODY_PARENTS[joint])]
+    return offsets
+
+
 def resample_body_transforms(
     positions: np.ndarray,
     rotations_wxyz: np.ndarray,
@@ -108,6 +146,7 @@ def smplx_body_forward_kinematics(
     trans: np.ndarray,
     root_orient: np.ndarray,
     pose_body: np.ndarray,
+    body_offsets: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Convert SMPL-X body poses to world body positions and WXYZ rotations."""
 
@@ -126,12 +165,15 @@ def smplx_body_forward_kinematics(
     world_rot = np.empty_like(local_rot)
     world_pos = np.empty((frames, SMPLX_BODY_COUNT, 3), dtype=np.float32)
     world_rot[:, 0] = local_rot[:, 0]
-    world_pos[:, 0] = trans
+    offsets = BODY_OFFSETS if body_offsets is None else np.asarray(body_offsets, dtype=np.float32)
+    if offsets.shape != (SMPLX_BODY_COUNT, 3):
+        raise ValueError(f"body_offsets must have shape {(SMPLX_BODY_COUNT, 3)}, got {offsets.shape}")
+    world_pos[:, 0] = trans + offsets[0]
     for joint in range(1, SMPLX_BODY_COUNT):
         parent = int(BODY_PARENTS[joint])
         world_rot[:, joint] = world_rot[:, parent] @ local_rot[:, joint]
         world_pos[:, joint] = world_pos[:, parent] + np.einsum(
-            "fij,j->fi", world_rot[:, parent], BODY_OFFSETS[joint]
+            "fij,j->fi", world_rot[:, parent], offsets[joint]
         )
     return world_pos[:, NEURAL_BODY_INDICES], matrix_to_quaternion_wxyz(
         world_rot[:, NEURAL_BODY_INDICES]
@@ -147,23 +189,66 @@ class AccadSmplxMotion:
     fps: float = TARGET_FPS
 
     @classmethod
-    def from_npz(cls, path: str | Path, *, target_fps: float = TARGET_FPS) -> "AccadSmplxMotion":
+    def from_npz(
+        cls,
+        path: str | Path,
+        *,
+        target_fps: float = TARGET_FPS,
+        body_model_path: str | Path | None = None,
+    ) -> "AccadSmplxMotion":
         path = Path(path).expanduser().resolve()
         with np.load(path, allow_pickle=True) as data:
-            required = ("mocap_frame_rate", "trans", "root_orient", "pose_body")
-            missing = [key for key in required if key not in data]
-            if missing:
-                raise KeyError(f"ACCAD file is missing fields: {missing}")
-            source_fps = float(np.asarray(data["mocap_frame_rate"]).reshape(-1)[0])
+            accad_fields = ("mocap_frame_rate", "trans", "root_orient", "pose_body")
+            cmu_fields = ("mocap_framerate", "trans", "poses")
+            if all(key in data for key in accad_fields):
+                source_fps = float(np.asarray(data["mocap_frame_rate"]).reshape(-1)[0])
+                trans = np.asarray(data["trans"], dtype=np.float32)
+                root_orient = np.asarray(data["root_orient"], dtype=np.float32)
+                pose_body = np.asarray(data["pose_body"], dtype=np.float32)
+                source_format = "ACCAD SMPL-X stage-II"
+            elif all(key in data for key in cmu_fields):
+                # CMU/SMPL stores root + body local rotations in ``poses``.
+                # The first 22 joints use the same pelvis/body ordering as
+                # BODY_PARENTS; later joints are hands/face and are unused.
+                poses = np.asarray(data["poses"], dtype=np.float32)
+                if poses.ndim != 2 or poses.shape[1] < SMPLX_BODY_COUNT * 3:
+                    raise ValueError(
+                        "CMU poses must have shape [frames, >=66], "
+                        f"got {poses.shape}"
+                    )
+                pose_vectors = poses.reshape(poses.shape[0], -1, 3)
+                source_fps = float(np.asarray(data["mocap_framerate"]).reshape(-1)[0])
+                trans = np.asarray(data["trans"], dtype=np.float32)
+                root_orient = pose_vectors[:, 0]
+                pose_body = pose_vectors[:, 1:SMPLX_BODY_COUNT].reshape(
+                    poses.shape[0], (SMPLX_BODY_COUNT - 1) * 3
+                )
+                source_format = "CMU SMPL"
+            else:
+                available = set(data.files)
+                raise KeyError(
+                    "motion file is neither ACCAD SMPL-X stage-II nor CMU SMPL; "
+                    f"available fields: {sorted(available)}"
+                )
+            body_offsets = None
+            if body_model_path is not None:
+                betas = data["betas"] if "betas" in data else None
+                body_offsets = official_smplx_body_offsets(body_model_path, betas)
             positions, rotations = smplx_body_forward_kinematics(
-                data["trans"], data["root_orient"], data["pose_body"]
+                trans, root_orient, pose_body, body_offsets=body_offsets
             )
         if not np.isfinite(source_fps) or source_fps <= 0 or target_fps <= 0:
             raise ValueError("ACCAD and target FPS must be positive")
         positions, rotations = resample_body_transforms(
             positions, rotations, source_fps, target_fps
         )
-        return cls(positions, rotations, float(target_fps))
+        motion = cls(positions, rotations, float(target_fps))
+        print(
+            f"Loaded {source_format}: frames={len(positions)}, "
+            f"source_fps={source_fps:g}, target_fps={target_fps:g}"
+            + (", official SMPL-X skeleton" if body_model_path is not None else "")
+        )
+        return motion
 
     def history(self, frame: int) -> tuple[np.ndarray, np.ndarray]:
         if self.body_positions_w.ndim != 3 or self.body_positions_w.shape[1:] != (14, 3):
@@ -174,6 +259,7 @@ class AccadSmplxMotion:
 
 __all__ = [
     "AccadSmplxMotion",
+    "official_smplx_body_offsets",
     "resample_body_transforms",
     "smplx_body_forward_kinematics",
 ]
