@@ -13,8 +13,8 @@ PACKAGE_NAME = "bxi_example_py_elf3"
 # ``npz`` uses the existing retargeted RGMT motion; ``neural_retarget`` uses
 # the SMPL-X/ACCAD input and the Transformer adapter before RGMT.
 # RGMT_REFERENCE_MODE = "npz"
-# RGMT_REFERENCE_MODE = "neural_retarget"  # "npz", "neural_retarget", or "pico"
-RGMT_REFERENCE_MODE = "pico"
+RGMT_REFERENCE_MODE = "neural_retarget"  # "npz", "neural_retarget", or "pico"
+# RGMT_REFERENCE_MODE = "pico"
 PICO_POSE_ENDPOINT = "tcp://127.0.0.1:28704"
 
 # PICO runtime is optional.  Set RGMT_REFERENCE_MODE to "pico" to enable
@@ -35,7 +35,7 @@ PICO_SENDER_PYTHONPATH = os.environ.get("PICO_SENDER_PYTHONPATH", "")
 NPZ_FILE_PATHS = {
 
     # 官方 SMPL-X 模型：用于 neural_retarget 的形状相关骨架偏移。
-    "smplx_model": "policy/body_models/smplx/SMPLX_NEUTRAL.npz",
+    "smplx_model": "policy/body_models/smplx/SMPLX_NEUTRAL_compact.npz",
 
     #smplx
     "smplx": "policy/cmu_1h_new/88/88_06_poses.npz",    #旋转踢

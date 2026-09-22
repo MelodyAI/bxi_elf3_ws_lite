@@ -4,7 +4,14 @@ log/
 cmu_1h_new/
 lafan1_npz/
 ACCAD/
-body_models/
+#body_models/
+# Keep only the small runtime skeletons under version control; the original
+# multi-hundred-megabyte SMPL-X assets remain ignored.
+!src/bxi_example_py_elf3/policy/body_models/
+src/bxi_example_py_elf3/policy/body_models/*
+!src/bxi_example_py_elf3/policy/body_models/smplx/
+src/bxi_example_py_elf3/policy/body_models/smplx/*
+!src/bxi_example_py_elf3/policy/body_models/smplx/*_compact.npz
 test/
 #*.npz
 #*.onnx
