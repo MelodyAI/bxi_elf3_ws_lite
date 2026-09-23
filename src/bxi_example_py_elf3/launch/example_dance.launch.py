@@ -6,7 +6,7 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 import json
 
-from bxi_example_py_elf3.model_config import RGMT_REFERENCE_MODE, PICO_POSE_ENDPOINT, get_model_file_dicts
+from bxi_example_py_elf3.model_config import RGMT_REFERENCE_MODE, PICO_POSE_ENDPOINT, ZEROLAB_POSE_ENDPOINT, get_model_file_dicts
 from bxi_example_py_elf3.pico_launch import make_pico_launch_actions
 
 def generate_launch_description():
@@ -39,6 +39,7 @@ def generate_launch_description():
                     {"/use_hardware": False},
                     {"/rgmt_reference_mode": RGMT_REFERENCE_MODE},
                     {"/pico_pose_endpoint": PICO_POSE_ENDPOINT},
+                    {"/zerolab_pose_endpoint": ZEROLAB_POSE_ENDPOINT},
                     {"/npz_file_dict": json.dumps(npz_file_dict)},
                     {"/onnx_file_dict": json.dumps(onnx_file_dict)},
                 ],

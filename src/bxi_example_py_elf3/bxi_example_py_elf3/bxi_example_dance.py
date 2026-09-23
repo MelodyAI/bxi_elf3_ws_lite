@@ -28,6 +28,7 @@ from bxi_example_py_elf3.models.rgmt import RgmtExternalReferencePolicy
 from bxi_example_py_elf3.models.neural_rgmt import NeuralRetargetRGMT
 from bxi_example_py_elf3.models.accad_smplx import AccadSmplxMotion
 from bxi_example_py_elf3.models.pico_human_client import PicoHumanPoseClient
+from bxi_example_py_elf3.models.zerolab_human_client import ZeroLabHumanPoseClient
 from bxi_example_py_elf3.models.beyondmimic import DanceMotionPolicyGravityIsaaclabV3
 from bxi_example_py_elf3.models.amp import  HumanoidGaitPolicyLite
 from bxi_example_py_elf3.utils.tfs import get_gravity_orientation
@@ -179,8 +180,12 @@ class BxiExample(Node):
                 self.onnx_file_dict["rgmt"],
                 reference_yaw_mode="initial",
             )
-            self.pico_pose_client = PicoHumanPoseClient(self.pico_pose_endpoint)
-            print(f"RGMT reference mode: pico, endpoint={self.pico_pose_endpoint}")
+            if self.rgmt_reference_mode == 'pico':
+                self.pico_pose_client = PicoHumanPoseClient(self.pico_pose_endpoint)
+                print(f"RGMT reference mode: pico, endpoint={self.pico_pose_endpoint}")
+            else:
+                self.pico_pose_client = ZeroLabHumanPoseClient(self.zerolab_pose_endpoint)
+                print(f"RGMT reference mode: zerolab, endpoint={self.zerolab_pose_endpoint}")
         
         # beyondmimic模型
         self.dance_lie_down = DanceMotionPolicyGravityIsaaclabV3(self.npz_file_dict["lie_down"], self.onnx_file_dict["lie_down"], start_frame=160,fixed_pos=True)#fixed policy
@@ -211,7 +216,7 @@ class BxiExample(Node):
                 history = self.pico_pose_client.history()
                 if history is None or self.pico_pose_client.stale(timeout_s=0.25):
                     if not self._pico_waiting_logged:
-                        print("PICO pose unavailable/stale; holding default standing pose")
+                        print("Tracking pose unavailable/stale; holding default standing pose")
                         self._pico_waiting_logged = True
                     if self._pico_tracking_active:
                         self.neural_rgmt.reset()
@@ -241,7 +246,7 @@ class BxiExample(Node):
             if self.pico_pose_client is not None:
                 self._pico_tracking_active = True
                 if not self._pico_active_logged:
-                    print("PICO canonical reference ready; blending into RGMT", flush=True)
+                    print("Canonical tracking reference ready; blending into RGMT", flush=True)
                     self._pico_active_logged = True
                 self._pico_blend_step += 1
                 alpha = min(1.0, self._pico_blend_step * self.dt / 0.6)
@@ -453,7 +458,7 @@ class BxiExample(Node):
                         self.dance_flag = 0
                     if self.motion_type == motionType.amp_walk:
                         self.dance_flag = 1
-                        if self.rgmt_reference_mode in {'neural_retarget', 'pico'}:
+                        if self.rgmt_reference_mode in {'neural_retarget', 'pico', 'zerolab'}:
                             self.neural_rgmt.reset()
                             self._pico_active_logged = False
                             self._pico_tracking_active = False
@@ -467,8 +472,8 @@ class BxiExample(Node):
                                 )
                             previous_motion = self.motion_type
                             self.motion_type = motionType.rgmt_neural
-                            if self.rgmt_reference_mode == 'pico':
-                                # No valid PICO frame may be available yet;
+                            if self.rgmt_reference_mode in {'pico', 'zerolab'}:
+                                # No valid tracking frame may be available yet;
                                 # switch immediately to the safe standing
                                 # fallback instead of blending a stale motion.
                                 self.transition_active = False
@@ -866,9 +871,11 @@ class BxiExample(Node):
         ).lower()
         self.declare_parameter('/pico_pose_endpoint', 'tcp://127.0.0.1:28704')
         self.pico_pose_endpoint = str(self.get_parameter('/pico_pose_endpoint').value)
-        if self.rgmt_reference_mode not in {'npz', 'neural_retarget', 'pico'}:
+        self.declare_parameter('/zerolab_pose_endpoint', 'tcp://127.0.0.1:5558')
+        self.zerolab_pose_endpoint = str(self.get_parameter('/zerolab_pose_endpoint').value)
+        if self.rgmt_reference_mode not in {'npz', 'neural_retarget', 'pico', 'zerolab'}:
             raise ValueError(
-                "'/rgmt_reference_mode' must be 'npz', 'neural_retarget', or 'pico', "
+                "'/rgmt_reference_mode' must be 'npz', 'neural_retarget', 'pico', or 'zerolab', "
                 f"got {self.rgmt_reference_mode!r}"
             )
 
