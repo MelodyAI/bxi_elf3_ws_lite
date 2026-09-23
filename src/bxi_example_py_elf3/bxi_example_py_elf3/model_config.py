@@ -12,8 +12,8 @@ PACKAGE_NAME = "bxi_example_py_elf3"
 # Change this one value to select the reference source used by the X key.
 # ``npz`` uses the existing retargeted RGMT motion; ``neural_retarget`` uses
 # the SMPL-X/ACCAD input and the Transformer adapter before RGMT.
-# RGMT_REFERENCE_MODE = "npz"
-RGMT_REFERENCE_MODE = "neural_retarget"  # "npz", "neural_retarget", or "pico"
+RGMT_REFERENCE_MODE = "npz"
+# RGMT_REFERENCE_MODE = "neural_retarget"  # "npz", "neural_retarget", or "pico"
 # RGMT_REFERENCE_MODE = "pico"
 PICO_POSE_ENDPOINT = "tcp://127.0.0.1:28704"
 
@@ -66,15 +66,15 @@ NPZ_FILE_PATHS = {
     # "rgmt": "policy/cmu_1h_new/80/80_15_stageii.npz",    #操作
     
     # "rgmt": "policy/cmu_1h_new/85/85_01_stageii.npz",    #升龙踢腿
-    # "rgmt": "policy/cmu_1h_new/85/85_03_stageii.npz",    #街舞
+    # "rgmt": "policy/cmu_1h_new/85/85_03_stageii.npz",    #街舞#
     # "rgmt": "policy/cmu_1h_new/85/85_04_stageii.npz",    #街舞
-    # "rgmt": "policy/cmu_1h_new/85/85_05_stageii.npz",    #街舞
-    # "rgmt": "policy/cmu_1h_new/85/85_06_stageii.npz",    #街舞
+    # "rgmt": "policy/cmu_1h_new/85/85_05_stageii.npz",    #街舞-倒立
+    # "rgmt": "policy/cmu_1h_new/85/85_06_stageii.npz",    #街舞-韦伯斯特
     # "rgmt": "policy/cmu_1h_new/85/85_07_stageii.npz",    #街舞-后脚翻
     # "rgmt": "policy/cmu_1h_new/85/85_08_stageii.npz",    #街舞-托马斯
     # "rgmt": "policy/cmu_1h_new/85/85_09_stageii.npz",    #马步
     # "rgmt": "policy/cmu_1h_new/85/85_10_stageii.npz",    #bad?
-    # "rgmt": "policy/cmu_1h_new/85/85_11_stageii.npz",    #街舞
+    # "rgmt": "policy/cmu_1h_new/85/85_11_stageii.npz",    #街舞#
     # "rgmt": "policy/cmu_1h_new/85/85_12_stageii.npz",    #街舞-hard
     # "rgmt": "policy/cmu_1h_new/85/85_13_stageii.npz",    #街舞-倒立x2
     # "rgmt": "policy/cmu_1h_new/85/85_14_stageii.npz",    #街舞-后手翻
@@ -83,7 +83,7 @@ NPZ_FILE_PATHS = {
     
     # "rgmt": "policy/cmu_1h_new/88/88_03_stageii.npz",    #马步
     # "rgmt": "policy/cmu_1h_new/88/88_05_stageii.npz",    #bad
-    # "rgmt": "policy/cmu_1h_new/88/88_06_stageii.npz",    #旋转踢
+    # "rgmt": "policy/cmu_1h_new/88/88_06_stageii.npz",    #旋转踢#
     # "rgmt": "policy/cmu_1h_new/88/88_07_stageii.npz",    #侧倒立
     # "rgmt": "policy/cmu_1h_new/88/88_08_stageii.npz",    #后手翻
     # "rgmt": "policy/cmu_1h_new/88/88_09_stageii.npz",    #后手翻
@@ -91,9 +91,9 @@ NPZ_FILE_PATHS = {
     # "rgmt": "policy/cmu_1h_new/88/88_11_stageii.npz",    #热身-hard
     
     # "rgmt": "policy/cmu_1h_new/90/90_01_stageii.npz",    #后滚翻
-    "rgmt": "policy/cmu_1h_new/90/90_02_stageii.npz",    #侧手翻
-    # "rgmt": "policy/cmu_1h_new/90/90_03_stageii.npz",    #侧手翻
-    # "rgmt": "policy/cmu_1h_new/90/90_04_stageii.npz",    #侧手翻
+    "rgmt": "policy/cmu_1h_new/90/90_02_stageii.npz",    #侧手翻#
+    # "rgmt": "policy/cmu_1h_new/90/90_03_stageii.npz",    #侧手翻#
+    # "rgmt": "policy/cmu_1h_new/90/90_04_stageii.npz",    #侧手翻#
     # "rgmt": "policy/cmu_1h_new/90/90_05_stageii.npz",    #回旋踢
     # "rgmt": "policy/cmu_1h_new/90/90_06_stageii.npz",    #回旋踢
     # "rgmt": "policy/cmu_1h_new/90/90_07_stageii.npz",    #回旋踢
@@ -112,7 +112,7 @@ NPZ_FILE_PATHS = {
     # "rgmt": "policy/cmu_1h_new/90/90_23_stageii.npz",    #walk
     # "rgmt": "policy/cmu_1h_new/90/90_28_stageii.npz",    #乌龙角柱
     # "rgmt": "policy/cmu_1h_new/90/90_29_stageii.npz",    #连续翻
-    # "rgmt": "policy/cmu_1h_new/90/90_30_stageii.npz",   #俄罗斯舞
+    # "rgmt": "policy/cmu_1h_new/90/90_30_stageii.npz",   #俄罗斯舞#
     # "rgmt": "policy/cmu_1h_new/90/90_31_stageii.npz",    #俄罗斯舞
     # "rgmt": "policy/cmu_1h_new/90/90_32_stageii.npz",    #walk_bad
     # "rgmt": "policy/cmu_1h_new/90/90_33_stageii.npz",    #前滚翻
@@ -142,10 +142,7 @@ ONNX_FILE_PATHS = {
     # "amp_run": "policy/myrun14.onnx",#run_dwaq
 
     # "rgmt": "policy/rgmtr_195000.onnx",
-    # "rgmt": "policy/rgmtr_9200.onnx",
-    # "rgmt": "policy/rgmtr_13000.onnx",
-    # "rgmt": "policy/rgmtr_24600.onnx",
-    "rgmt": "policy/rgmtr_40200.onnx",
+    "rgmt": "policy/rgmtr_59400.onnx",
     
     "neural_retarget": "policy/neural_retarget_fast.onnx",
     
