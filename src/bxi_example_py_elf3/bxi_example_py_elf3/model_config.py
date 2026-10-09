@@ -48,7 +48,7 @@ NPZ_FILE_PATHS = {
 
     #lafan1
     # "rgmt": "policy/lafan1_npz/ground1_subject1.npz",
-    # "rgmt": "policy/lafan1_npz/fight1_subject2.npz",
+    "rgmt": "policy/lafan1_npz/fight1_subject2.npz",
     # "rgmt": "policy/lafan1_npz/aiming1_subject1.npz",
     # "rgmt": "policy/lafan1_npz/multipleActions1_subject1.npz",
     # "rgmt": "policy/lafan1_npz/fallAndGetUp1_subject4.npz",
@@ -62,8 +62,10 @@ NPZ_FILE_PATHS = {
     # "rgmt": "policy/lafan1_npz/walk1_subject5.npz",
 
     #cmu
+    # "rgmt": "policy/cmu_1h_new/75/75_03_stageii.npz",    #跳
     # "rgmt": "policy/cmu_1h_new/75/75_15_stageii.npz",    #跳
     # "rgmt": "policy/cmu_1h_new/80/80_15_stageii.npz",    #操作
+    
     
     # "rgmt": "policy/cmu_1h_new/85/85_01_stageii.npz",    #升龙踢腿
     # "rgmt": "policy/cmu_1h_new/85/85_03_stageii.npz",    #街舞#
@@ -91,7 +93,7 @@ NPZ_FILE_PATHS = {
     # "rgmt": "policy/cmu_1h_new/88/88_11_stageii.npz",    #热身-hard
     
     # "rgmt": "policy/cmu_1h_new/90/90_01_stageii.npz",    #后滚翻
-    "rgmt": "policy/cmu_1h_new/90/90_02_stageii.npz",    #侧手翻#
+    # "rgmt": "policy/cmu_1h_new/90/90_02_stageii.npz",    #侧手翻#
     # "rgmt": "policy/cmu_1h_new/90/90_03_stageii.npz",    #侧手翻#
     # "rgmt": "policy/cmu_1h_new/90/90_04_stageii.npz",    #侧手翻#
     # "rgmt": "policy/cmu_1h_new/90/90_05_stageii.npz",    #回旋踢
@@ -141,8 +143,8 @@ ONNX_FILE_PATHS = {
     "amp_run": "policy/myrun10.onnx",##hw 5=5.18
     # "amp_run": "policy/myrun14.onnx",#run_dwaq
 
-    # "rgmt": "policy/rgmtr_195000.onnx",
-    "rgmt": "policy/rgmtr_59400.onnx",
+    "rgmt": "policy/rgmtr_125200.onnx",
+
     
     "neural_retarget": "policy/neural_retarget_fast.onnx",
     
