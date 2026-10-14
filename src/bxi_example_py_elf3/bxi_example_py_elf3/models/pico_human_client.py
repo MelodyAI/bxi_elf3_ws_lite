@@ -1,4 +1,4 @@
-"""Standalone PICO human-pose receiver for neural retargeting.
+"""PICO pose receiver for neural14 histories or asynchronous live SMPL22.
 
 This module deliberately has no dependency on the GRIT repository.  A small
 PICO/XR bridge publishes multipart ZeroMQ messages:
@@ -12,31 +12,72 @@ from __future__ import annotations
 
 from collections import deque
 import time
+from threading import Event, RLock, Thread
 
 import numpy as np
 from .pico_contract import decode_packet
 
 
 class PicoHumanPoseClient:
-    def __init__(self, endpoint: str = "tcp://127.0.0.1:28704", *, history_size: int = 20):
+    def __init__(self, endpoint: str = "tcp://127.0.0.1:28704", *, history_size: int = 20,
+                 body_layout="neural14", hold_missing_frames=True, async_receive=False):
         import zmq
 
         self.history_size = int(history_size)
+        if body_layout not in {"neural14", "smpl22"}:
+            raise ValueError("Unsupported PICO body layout")
+        self.body_layout = body_layout
+        self.hold_missing_frames = bool(hold_missing_frames)
+        self._last_packet_stamp = None
+        self._async_receive = bool(async_receive)
+        self._endpoint = str(endpoint)
+        self._data_lock = RLock()
+        self._stop = Event()
+        self._thread = None
+        self._reported_received_count = 0
         if self.history_size < 1:
             raise ValueError("history_size must be positive")
         self._context = zmq.Context.instance()
-        self._socket = self._context.socket(zmq.PULL)
-        self._socket.setsockopt(zmq.LINGER, 0)
-        self._socket.setsockopt(zmq.RCVHWM, 2)
-        self._socket.connect(str(endpoint))
+        self._socket = None
         self._positions = deque(maxlen=self.history_size)
         self._rotations = deque(maxlen=self.history_size)
         self.last_timestamp_ns = 0
         self.last_receive_ns = 0
         self._received_count = 0
         self.last_error = None
+        if self._async_receive:
+            self._thread = Thread(target=self._receive_loop, name="pico-pose-receiver", daemon=True)
+            self._thread.start()
+        else:
+            self._socket = self._make_socket()
+
+    def _make_socket(self):
+        import zmq
+        socket = self._context.socket(zmq.PULL)
+        socket.setsockopt(zmq.LINGER, 0)
+        socket.setsockopt(zmq.RCVHWM, 2)
+        socket.connect(self._endpoint)
+        return socket
+
+    def _receive_loop(self):
+        self._socket = self._make_socket()
+        try:
+            while not self._stop.is_set():
+                self._socket.poll(5)
+                with self._data_lock:
+                    self._poll_socket()
+        finally:
+            self._socket.close(0)
 
     def poll(self) -> int:
+        if not self._async_receive:
+            return self._poll_socket()
+        with self._data_lock:
+            count = self._received_count - self._reported_received_count
+            self._reported_received_count = self._received_count
+            return count
+
+    def _poll_socket(self) -> int:
         """Drain the socket and return the number of newly received frames."""
         import zmq
 
@@ -54,14 +95,18 @@ class PicoHumanPoseClient:
             if len(parts) != 3:
                 continue
             try:
-                header, positions, rotations = decode_packet(parts)
-            except (ValueError, KeyError, TypeError) as error:
+                header, positions, rotations = decode_packet(parts, body_layout=self.body_layout)
+                source_ns = int(header.get("recv_ns", 0))
+            except (ValueError, KeyError, TypeError, OverflowError) as error:
                 if str(error) != self.last_error:
                     print(f"PICO rejected: {error}", flush=True)
                     self.last_error = str(error)
                 continue
             self.last_error = None
-            source_ns = int(header.get("recv_ns", 0))
+            if not self.hold_missing_frames and source_ns > 0:
+                if source_ns <= (self._last_packet_stamp or 0):
+                    continue  # Duplicates/out-of-order packets never renew freshness.
+                self._last_packet_stamp = source_ns
             self.last_receive_ns = time.monotonic_ns()
             if source_ns <= 0:
                 # Keep compatibility with old test/replay packets that do not
@@ -85,7 +130,7 @@ class PicoHumanPoseClient:
             # Use the local control-sample time for the Transformer timeline;
             # the sender timestamp identifies packet freshness.
             self.last_timestamp_ns = time.monotonic_ns()
-        elif received == 0 and self._positions and not self.stale():
+        elif self.hold_missing_frames and received == 0 and self._positions and not self.stale():
             # Hold the newest pose through a short transport gap while still
             # advancing the fixed 50 Hz Transformer timeline.
             self._positions.append(self._positions[-1].copy())
@@ -94,20 +139,31 @@ class PicoHumanPoseClient:
         return received
 
     def history(self) -> tuple[np.ndarray, np.ndarray] | None:
-        if len(self._positions) < self.history_size:
-            return None
-        positions = list(self._positions)
-        rotations = list(self._rotations)
+        with self._data_lock:
+            if len(self._positions) < self.history_size:
+                return None
+            positions = list(self._positions)
+            rotations = list(self._rotations)
         while len(positions) < self.history_size:
             positions.insert(0, positions[0])
             rotations.insert(0, rotations[0])
         return np.stack(positions), np.stack(rotations)
 
+    def history_sample(self):
+        """Atomic transforms + sample timestamp for asynchronous live tracking."""
+        with self._data_lock:
+            history = self.history()
+            return None if history is None else (history, self.last_timestamp_ns)
+
     def stale(self, timeout_s: float = 0.25) -> bool:
         return self.last_receive_ns <= 0 or (time.monotonic_ns() - self.last_receive_ns) > timeout_s * 1e9
 
     def close(self) -> None:
-        self._socket.close(0)
+        if self._async_receive:
+            self._stop.set()
+            self._thread.join(timeout=1.)
+        else:
+            self._socket.close(0)
 
 
 __all__ = ["PicoHumanPoseClient"]

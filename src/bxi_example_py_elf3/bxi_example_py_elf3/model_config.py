@@ -12,12 +12,18 @@ PACKAGE_NAME = "bxi_example_py_elf3"
 # Change this one value to select the reference source used by the X key.
 # ``npz`` uses the existing retargeted RGMT motion; ``neural_retarget`` uses
 # the SMPL-X/ACCAD input and the Transformer adapter before RGMT.
+# ``umr`` asynchronously retargets raw SMPL/SMPL-X NPZ or LAFAN1 BVH while
+# playing, using a bounded lookahead buffer and the existing deployment libraries.
+# ``pico_umr`` uses live PICO SMPL22 poses -> UMR -> RGMT with robot feedback.
 RGMT_REFERENCE_MODE = "npz"
 # RGMT_REFERENCE_MODE = "neural_retarget"  # "npz", "neural_retarget", or "pico"
 # RGMT_REFERENCE_MODE = "pico"
+# RGMT_REFERENCE_MODE = "pico_umr"  # "npz", "neural_retarget", "pico", "umr", "pico_umr"
 PICO_POSE_ENDPOINT = "tcp://127.0.0.1:28704"
+# 80 ms 衰减时间常数的限幅预测，无需等待未来帧；设为 0 可对照保持模式。
+PICO_UMR_PREDICTION_TIME_S = float(os.environ.get("PICO_UMR_PREDICTION_TIME_S", "0.08"))
 
-# PICO runtime is optional.  Set RGMT_REFERENCE_MODE to "pico" to enable
+# PICO runtime is optional.  Set RGMT_REFERENCE_MODE to "pico" or "pico_umr" to enable
 # launch-managed service and sender processes.  A matching prebuilt runtime is
 # bundled under third_party/pico; external paths can still be configured.
 PICO_AUTO_START_SERVICE = True
@@ -34,7 +40,13 @@ PICO_SENDER_PYTHONPATH = os.environ.get("PICO_SENDER_PYTHONPATH", "")
 # simulation and hardware launch files use the same dictionaries.
 NPZ_FILE_PATHS = {
 
-    # 官方 SMPL-X 模型：用于 neural_retarget 的形状相关骨架偏移。
+    # UMR 原始动作输入：选一个 NPZ/BVH 文件，无需预先转换。
+    "umr": "policy/lafan1_orin/dance1_subject2.bvh",
+    # "umr": "policy/cmu_orin/88/88_06_poses.npz",  # CMU 旋转踢
+    "umr_robot": "robot/elf3_lite/xml/elf3.xml",
+    "umr_runtime": "third_party/umr",
+
+    # 官方 SMPL-X 紧凑模型：用于 neural_retarget 骨架及 UMR NPZ 的人体形状。
     "smplx_model": "policy/body_models/smplx/SMPLX_NEUTRAL_compact.npz",
 
     #smplx
@@ -48,7 +60,7 @@ NPZ_FILE_PATHS = {
 
     #lafan1
     # "rgmt": "policy/lafan1_npz/ground1_subject1.npz",
-    "rgmt": "policy/lafan1_npz/fight1_subject2.npz",
+    "rgmt": "policy/lafan1_npz/fightAndSports1_subject1.npz",
     # "rgmt": "policy/lafan1_npz/aiming1_subject1.npz",
     # "rgmt": "policy/lafan1_npz/multipleActions1_subject1.npz",
     # "rgmt": "policy/lafan1_npz/fallAndGetUp1_subject4.npz",

@@ -37,7 +37,7 @@ def _prepend_env_paths(*paths: Path, current: str = "") -> str:
 
 def make_pico_launch_actions():
     """Return launch-managed PICO service/sender processes."""
-    if str(RGMT_REFERENCE_MODE).lower() != "pico":
+    if str(RGMT_REFERENCE_MODE).lower() not in {"pico", "pico_umr"}:
         return []
 
     actions = []
@@ -115,6 +115,8 @@ def make_pico_launch_actions():
                 PICO_SENDER_ENDPOINT,
                 "--fps",
                 str(PICO_SENDER_FPS),
+                "--body-layout",
+                "smpl22" if RGMT_REFERENCE_MODE == "pico_umr" else "neural14",
             ],
             output="screen",
             emulate_tty=True,

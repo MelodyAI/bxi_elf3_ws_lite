@@ -73,7 +73,10 @@ def get_third_party_files():
     source_dir = os.path.join(setup_dir, 'third_party')
     target_dir = os.path.join('share', package_name, 'third_party')
     for root, dirs, files in os.walk(source_dir):
+        dirs[:] = [directory for directory in dirs if directory != '__pycache__']
         for file in files:
+            if file.endswith(('.pyc', '.pyo')):
+                continue
             file_path = os.path.relpath(
                 os.path.join(root, file),
                 os.getcwd(),

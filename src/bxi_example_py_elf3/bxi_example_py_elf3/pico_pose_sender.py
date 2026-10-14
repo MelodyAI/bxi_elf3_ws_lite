@@ -1,4 +1,4 @@
-"""Read XRoboToolkit PICO tracking and publish the ELF3 14-body protocol."""
+"""Publish PICO tracking as ELF3 neural14 or live-UMR SMPL22 transforms."""
 
 from __future__ import annotations
 
@@ -8,14 +8,14 @@ import threading
 import time
 
 import numpy as np
-from .models.pico_contract import BODY_NAMES, CONTRACT, convert_xr_pose
+from .models.pico_contract import BODY_NAMES, CONTRACT, SMPL22_BODY_NAMES, SMPL22_CONTRACT, convert_xr_pose
 
 
 XR_BODY_COUNT = 24
 
 
 class PicoPoseSender:
-    def __init__(self, endpoint: str, publish_fps: float) -> None:
+    def __init__(self, endpoint: str, publish_fps: float, *, body_layout="neural14") -> None:
         try:
             import xrobotoolkit_sdk as xrt
         except ImportError as exc:
@@ -25,6 +25,7 @@ class PicoPoseSender:
         import zmq
 
         self.xrt = xrt
+        self.body_layout = body_layout
         self.period_s = 1.0 / float(publish_fps)
         self._lock = threading.Lock()
         self._latest = None
@@ -79,7 +80,9 @@ class PicoPoseSender:
         print("Standalone PICO pose sender started")
         try:
             self.xrt.init()
+            next_tick = time.monotonic()
             while True:
+                next_tick += self.period_s
                 self._poll_sdk()
                 with self._lock:
                     poses = None if self._latest is None else self._latest.copy()
@@ -89,13 +92,14 @@ class PicoPoseSender:
                     last_poll_pose = poses.copy()
                 if poses is not None:
                     try:
-                        positions, rotations = convert_xr_pose(poses)
+                        positions, rotations = convert_xr_pose(poses, body_layout=self.body_layout)
                     except ValueError:
-                        time.sleep(self.period_s)
+                        time.sleep(max(0., next_tick - time.monotonic()))
                         continue
                     header = json.dumps(
-                        {"contract": CONTRACT, "body_names": BODY_NAMES,
-                         "body_count": 14, "recv_ns": time.monotonic_ns(), "seq": self._seq}
+                        {"contract": SMPL22_CONTRACT if self.body_layout == "smpl22" else CONTRACT,
+                         "body_names": SMPL22_BODY_NAMES if self.body_layout == "smpl22" else BODY_NAMES,
+                         "body_count": len(positions), "recv_ns": time.monotonic_ns(), "seq": self._seq}
                     ).encode("utf-8")
                     try:
                         self._socket.send_multipart(
@@ -123,7 +127,12 @@ class PicoPoseSender:
                             )
                     except zmq.Again:
                         pass
-                time.sleep(self.period_s)
+                # SDK calls and transport work count toward the 20 ms period.
+                # Avoid period + processing time drift and catch-up bursts.
+                now = time.monotonic()
+                if now > next_tick + self.period_s:
+                    next_tick = now
+                time.sleep(max(0., next_tick - now))
         except KeyboardInterrupt:
             pass
         finally:
@@ -135,8 +144,9 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--endpoint", default="tcp://*:28704")
     parser.add_argument("--fps", type=float, default=50.0)
+    parser.add_argument("--body-layout", choices=("neural14", "smpl22"), default="neural14")
     args = parser.parse_args()
-    PicoPoseSender(args.endpoint, args.fps).run()
+    PicoPoseSender(args.endpoint, args.fps, body_layout=args.body_layout).run()
 
 
 if __name__ == "__main__":

@@ -159,6 +159,21 @@ class BxiExample(Node):
                 reference_yaw_mode="initial",  # 实机推荐
                 # reference_yaw_mode="continuous",
             )
+        elif self.rgmt_reference_mode == 'umr':
+            from bxi_example_py_elf3.models.umr_rgmt import UmrStreamingRGMT
+            self.rgmt = UmrStreamingRGMT(
+                self.npz_file_dict["umr"],
+                self.onnx_file_dict["rgmt"],
+                robot_xml=self.npz_file_dict["umr_robot"],
+                runtime_root=self.npz_file_dict["umr_runtime"],
+                body_model_path=self.npz_file_dict.get("smplx_model"),
+                reference_yaw_mode="initial",
+            )
+            self._umr_waiting_logged = False
+            self._umr_wait_target = None
+            self._umr_blend_step = 0
+            self._umr_performance_window = None
+            print(f"RGMT reference mode: umr, async streaming, frames={self.rgmt.end_frame + 1}")
         elif self.rgmt_reference_mode == 'neural_retarget':
             self.neural_rgmt = NeuralRetargetRGMT(
                 self.onnx_file_dict["neural_retarget"],
@@ -173,6 +188,21 @@ class BxiExample(Node):
                 "RGMT reference mode: neural_retarget, "
                 f"SMPL-X frames={len(self.smplx_motion.body_positions_w)}"
             )
+        elif self.rgmt_reference_mode == 'pico_umr':
+            from bxi_example_py_elf3.models.pico_umr import PicoUmrRGMT
+            self.neural_rgmt = PicoUmrRGMT(
+                self.onnx_file_dict["rgmt"],
+                robot_xml=self.npz_file_dict["umr_robot"],
+                runtime_root=self.npz_file_dict["umr_runtime"],
+                reference_yaw_mode="initial",
+                prediction_time_s=self.pico_umr_prediction_time_s,
+            )
+            self.pico_pose_client = PicoHumanPoseClient(
+                self.pico_pose_endpoint, history_size=1, body_layout="smpl22", hold_missing_frames=False,
+                async_receive=True)
+            self._pico_umr_performance_time = time.monotonic()
+            self._pico_umr_last_error = None
+            print(f"RGMT reference mode: pico_umr, live SMPL22 -> UMR -> RGMT, endpoint={self.pico_pose_endpoint}")
         else:
             self.neural_rgmt = NeuralRetargetRGMT(
                 self.onnx_file_dict["neural_retarget"],
@@ -199,6 +229,32 @@ class BxiExample(Node):
                 omega,
                 advance=self.dance_flag == 1,
             )
+            if self.rgmt_reference_mode == 'umr':
+                if self.rgmt.buffering and not self._umr_waiting_logged:
+                    print("UMR reference buffering; motion time is held")
+                    self._umr_waiting_logged = True
+                elif not self.rgmt.buffering and self._umr_waiting_logged:
+                    print("UMR reference ready; continuing RGMT tracking")
+                    self._umr_waiting_logged = False
+                if self.target_dof_pos is None:
+                    self.target_dof_pos = self.amp_walk.inference_step(
+                        q, dq, quat, omega, np.zeros(3, dtype=np.float32))
+                    self._umr_wait_target = self.target_dof_pos.copy()
+                    self._umr_blend_step = 0
+                    self.send_to_motor(self.target_dof_pos, self.amp_walk.kps, self.amp_walk.kds)
+                    return
+                if self._umr_wait_target is not None:
+                    # Start this ramp when the first reference becomes available;
+                    # the normal switch transition may have ended while buffering.
+                    self._umr_blend_step += 1
+                    alpha = min(1., self._umr_blend_step * self.dt / .6)
+                    self.target_dof_pos = (1 - alpha) * self._umr_wait_target + alpha * self.target_dof_pos
+                    kp = (1 - alpha) * self.amp_walk.kps + alpha * self.rgmt.kps
+                    kd = (1 - alpha) * self.amp_walk.kds + alpha * self.rgmt.kds
+                    self.send_to_motor(self.target_dof_pos, kp, kd)
+                    if alpha >= 1.:
+                        self._umr_wait_target = None
+                    return
             # inference_step 会将 timestep 饱和在 end_frame。到达末帧后继续
             # 运行策略以保留 proprio/action 历史，不再 end+1 -> end 回退。
             self.send_to_motor(self.target_dof_pos, self.rgmt.kps, self.rgmt.kds)
@@ -208,7 +264,13 @@ class BxiExample(Node):
                 raise RuntimeError("neural RGMT mode is not initialized")
             if self.pico_pose_client is not None:
                 self.pico_pose_client.poll()
-                history = self.pico_pose_client.history()
+                if self.rgmt_reference_mode == 'pico_umr':
+                    sample = self.pico_pose_client.history_sample()
+                    history = None if sample is None else sample[0]
+                    pose_sample_ns = 0 if sample is None else sample[1]
+                else:
+                    history = self.pico_pose_client.history()
+                    pose_sample_ns = self.pico_pose_client.last_timestamp_ns
                 if history is None or self.pico_pose_client.stale(timeout_s=0.25):
                     if not self._pico_waiting_logged:
                         print("PICO pose unavailable/stale; holding default standing pose")
@@ -231,10 +293,19 @@ class BxiExample(Node):
                 omega,
                 body_pos,
                 body_rot,
-                source_time_s=(self.pico_pose_client.last_timestamp_ns * 1e-9
+                source_time_s=(pose_sample_ns * 1e-9
                                if self.pico_pose_client is not None else self.smplx_frame * self.dt),
+                **({'advance': self.dance_flag == 1} if self.rgmt_reference_mode == 'pico_umr' else {}),
             )
             if self.target_dof_pos is None:
+                if self.rgmt_reference_mode == 'pico_umr':
+                    self._pico_tracking_active = False
+                    self._pico_active_logged = False
+                    self._pico_blend_step = 0
+                    error = self.neural_rgmt.last_error
+                    if error and error != self._pico_umr_last_error:
+                        print(f"PICO UMR reference unavailable: {error}", flush=True)
+                    self._pico_umr_last_error = error
                 self._pico_wait_balance(q, dq, quat, omega)
                 return
             kp, kd = self.neural_rgmt.rgmt.kps, self.neural_rgmt.rgmt.kds
@@ -453,7 +524,7 @@ class BxiExample(Node):
                         self.dance_flag = 0
                     if self.motion_type == motionType.amp_walk:
                         self.dance_flag = 1
-                        if self.rgmt_reference_mode in {'neural_retarget', 'pico'}:
+                        if self.rgmt_reference_mode in {'neural_retarget', 'pico', 'pico_umr'}:
                             self.neural_rgmt.reset()
                             self._pico_active_logged = False
                             self._pico_tracking_active = False
@@ -467,7 +538,7 @@ class BxiExample(Node):
                                 )
                             previous_motion = self.motion_type
                             self.motion_type = motionType.rgmt_neural
-                            if self.rgmt_reference_mode == 'pico':
+                            if self.rgmt_reference_mode in {'pico', 'pico_umr'}:
                                 # No valid PICO frame may be available yet;
                                 # switch immediately to the safe standing
                                 # fallback instead of blending a stale motion.
@@ -476,8 +547,13 @@ class BxiExample(Node):
                                 self._blend_pending = False
                             else:
                                 self.start_motion_transition(previous_motion)
-                            print("X: start neural_retarget -> RGMT tracking")
+                            print("X: start PICO -> UMR -> RGMT live tracking" if self.rgmt_reference_mode == 'pico_umr'
+                                  else "X: start neural_retarget -> RGMT tracking")
                         else:
+                            if self.rgmt_reference_mode == 'umr':
+                                self.rgmt.reset()
+                                self._umr_wait_target = None
+                                self._umr_blend_step = 0
                             self.rgmt.timestep = self.rgmt.start_frame
                             self.rgmt.timeinit = 0.0
                             self.switch_to_motion(self.rgmt, motionType.rgmt, num=20)
@@ -592,6 +668,32 @@ class BxiExample(Node):
             self.qvel = np.array(joint_vel)
 
     def timer_callback(self):
+        if self.rgmt_reference_mode == 'pico_umr' and time.monotonic() - self._pico_umr_performance_time >= 5.:
+            stats = self.neural_rgmt.performance_stats()
+            self.get_logger().info(
+                f"PICO UMR: processed={stats['processed']}, solve_capacity={stats['generation_hz']:.1f}Hz, "
+                f"reference_age_ms={stats['reference_age_ms']}, solve_to_source_ms={stats['solve_to_source_ms']}, "
+                f"backend={stats['backend']}, worker_pid={stats['worker_pid']}, "
+                f"prediction_time_ms={stats['prediction_time_ms']}")
+            self._pico_umr_performance_time = time.monotonic()
+        if self.rgmt_reference_mode == 'umr' and self.motion_type == motionType.rgmt and self.step == 2:
+            now = time.monotonic()
+            stats = self.rgmt.performance_stats()
+            if self._umr_performance_window is None:
+                self._umr_performance_window = [now, 0, stats["played_frames"], stats["underruns"]]
+            window = self._umr_performance_window
+            window[1] += 1
+            elapsed = now - window[0]
+            if elapsed >= 5.:
+                motion_hz = (stats["played_frames"] - window[2]) / elapsed
+                holds = stats["underruns"] - window[3]
+                self.get_logger().info(
+                    f"UMR rates: control={window[1] / elapsed:.1f}Hz, motion={motion_hz:.1f}Hz, "
+                    f"generation={stats['generation_hz']:.1f}Hz, buffer={stats['buffered_frames']}, "
+                    f"underruns={holds}, backend={stats['backend']}, worker_pid={stats['worker_pid']}")
+                self._umr_performance_window = [now, 0, stats["played_frames"], stats["underruns"]]
+        elif self.rgmt_reference_mode == 'umr':
+            self._umr_performance_window = None
         # ptyhon 与 rclpy 多线程不太友好，这里使用定时间+简易状态机运行a
         if self.step == 0:
             self.robot_reset(1, False) # first reset
@@ -866,9 +968,11 @@ class BxiExample(Node):
         ).lower()
         self.declare_parameter('/pico_pose_endpoint', 'tcp://127.0.0.1:28704')
         self.pico_pose_endpoint = str(self.get_parameter('/pico_pose_endpoint').value)
-        if self.rgmt_reference_mode not in {'npz', 'neural_retarget', 'pico'}:
+        self.declare_parameter('/pico_umr_prediction_time_s', .08)
+        self.pico_umr_prediction_time_s = float(self.get_parameter('/pico_umr_prediction_time_s').value)
+        if self.rgmt_reference_mode not in {'npz', 'neural_retarget', 'pico', 'umr', 'pico_umr'}:
             raise ValueError(
-                "'/rgmt_reference_mode' must be 'npz', 'neural_retarget', or 'pico', "
+                "'/rgmt_reference_mode' must be 'npz', 'neural_retarget', 'pico', 'umr', or 'pico_umr', "
                 f"got {self.rgmt_reference_mode!r}"
             )
 
@@ -995,6 +1099,8 @@ def main(args=None):
         executor.shutdown()
         if node.neural_rgmt is not None:
             node.neural_rgmt.close()
+        if node.rgmt is not None and hasattr(node.rgmt, "close"):
+            node.rgmt.close()
         if node.pico_pose_client is not None:
             node.pico_pose_client.close()
         node.destroy_node()

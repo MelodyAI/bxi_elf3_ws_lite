@@ -2,7 +2,9 @@ build/
 install/
 log/
 cmu_1h_new/
+cmu_orin/
 lafan1_npz/
+lafan1_orin/
 ACCAD/
 #body_models/
 # Keep only the small runtime skeletons under version control; the original
