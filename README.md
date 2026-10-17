@@ -120,8 +120,9 @@ python3 src/bxi_example_py_elf3/test_neural_retarget_accad.py \
 
 ## sim2sim
 
-当前仿真支持 **B 键深度行走**，默认使用 `dagger_new_position.onnx` 和最新腰部
-向下 65° 相机。先按 A 启动普通行走，再按 B 切换；B 再按一次或 A 返回普通行走。
+当前仿真支持 **B 键深度行走**，默认使用 `g1_25.onnx` 和腰部向下 65° 相机配置。
+深度按 Instinct NS 补洞后，使用行 `[12:48]`、范围 0.2–2.0 m，生成 `[1,36,36]`。
+先按 A 启动普通行走，再按 B 切换；B 再按一次或 A 返回普通行走。
 请先 `source /opt/bxi/bxi_ros2_pkg/setup.bash` 使用带深度输出的 MuJoCo 包，
 再 `source install/local_setup.bash`。模型与相机绑定、配置及验证见 [深度行走部署](docs/depth_walk.md)。
 

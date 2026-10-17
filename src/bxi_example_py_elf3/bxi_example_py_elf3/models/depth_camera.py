@@ -8,7 +8,7 @@ from .depth_projection import ProjectionSpec, project_depth
 
 
 class DepthCameraInput:
-    def __init__(self, *, mode="origin_camera", timeout_s=.5, uint16_scale=.001):
+    def __init__(self, *, mode="origin_camera", timeout_s=.5, uint16_scale=.001, depth_range=None):
         if mode not in {"origin_camera", "depth_walk"}:
             raise ValueError("Depth mode must be origin_camera or depth_walk")
         if not np.isfinite(timeout_s) or timeout_s <= 0.:
@@ -19,6 +19,13 @@ class DepthCameraInput:
         self.uint16_scale = float(uint16_scale)
         self.projection = (ProjectionSpec(36, 48, 45.2, 58.0616969, .2, 3.) if mode == "origin_camera"
                            else ProjectionSpec(64, 36, 89.24, 58.06, .2, 2.5))
+        if depth_range is not None:
+            values = tuple(float(value) for value in depth_range)
+            if len(values) != 2 or not np.isfinite(values).all():
+                raise ValueError('Depth range must contain two finite values')
+            spec = self.projection
+            self.projection = ProjectionSpec(spec.output_width, spec.output_height, spec.horizontal_fov_deg,
+                                             spec.vertical_fov_deg, *values)
         self.update_period_s = .05 if mode == "origin_camera" else .02
         self._lock = Lock()
         self._camera_info = None

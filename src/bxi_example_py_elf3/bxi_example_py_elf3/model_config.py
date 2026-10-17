@@ -23,7 +23,7 @@ PICO_UMR_PREDICTION_TIME_S = float(os.environ.get("PICO_UMR_PREDICTION_TIME_S", 
 # 仿真／真机 B 键：深度行走；A 键回普通 AMP，B 再按一次也可退出。
 DEPTH_WALK_ENABLED = True
 # DEPTH_WALK_ENABLED = False
-DEPTH_WALK_MODEL = "dagger_new_position"  # 最新腰部相机65°；旧模型 dagger2 / normal_depth
+DEPTH_WALK_MODEL = "g1_25"  # origin_camera；相机位姿和输入约定一起选择
 # 模型、图像契约与位姿一起选择。相机沿局部-Z看，生成器将视线俯角转换为四元数。
 DEPTH_WALK_PROFILES = {
     "dagger2": {
@@ -35,8 +35,13 @@ DEPTH_WALK_PROFILES = {
     "dagger_new_position": {
         "mode": "origin_camera", "position": (0.08599, 0.0175, -0.20651), "look_down_deg": 65.0,
     },
+    "g1_25": {
+        "mode": "origin_camera", "position": (0.08599, 0.0175, -0.20651), "look_down_deg": 65.0,
+        "preprocess": {"crop_rows": (12, 48), "depth_range": (0.2, 2.0)},
+    },
 }
 DEPTH_WALK_MODE = DEPTH_WALK_PROFILES[DEPTH_WALK_MODEL]["mode"]
+DEPTH_WALK_PREPROCESS = DEPTH_WALK_PROFILES[DEPTH_WALK_MODEL].get("preprocess", {})
 DEPTH_CAMERA_NAME = "body_depth_camera"
 DEPTH_CAMERA_PARENT = "torso_link"
 DEPTH_CAMERA_POSE = {

@@ -14,7 +14,7 @@ from ..utils.tfs import get_gravity_orientation
 
 
 class HumanoidGaitDepthPolicy:
-    def __init__(self, model_onnx_path, *, mode="origin_camera"):
+    def __init__(self, model_onnx_path, *, mode="origin_camera", crop_rows=None, depth_range=None):
         if mode not in {"origin_camera", "depth_walk"}:
             raise ValueError("Depth mode must be origin_camera or depth_walk")
         self.mode = mode
@@ -47,6 +47,18 @@ class HumanoidGaitDepthPolicy:
         self.depth_update_period = .05 if origin else .02
         self.depth_shape = (36, 36) if origin else (21, 32)
         self.received_depth_shape = (36, 48) if origin else (64, 36)
+        self.depth_range = tuple(float(value) for value in (depth_range if depth_range is not None
+                                                           else (.2, 3. if origin else 2.5)))
+        if (len(self.depth_range) != 2 or not np.isfinite(self.depth_range).all()
+                or not 0. <= self.depth_range[0] < self.depth_range[1]):
+            raise ValueError('Depth range must contain two finite increasing nonnegative values')
+        self.crop_rows = (2, 38) if origin and crop_rows is None else (tuple(crop_rows) if crop_rows is not None else None)
+        if self.crop_rows is not None:
+            if (not origin or len(self.crop_rows) != 2
+                    or any(isinstance(row, bool) or not isinstance(row, (int, np.integer)) for row in self.crop_rows)
+                    or not 0 <= self.crop_rows[0] < self.crop_rows[1] <= 48
+                    or self.crop_rows[1]-self.crop_rows[0] != 36):
+                raise ValueError('origin_camera crop_rows must select 36 rows within [0,48)')
         self.depth_indices = np.array([-1] if origin else [-36, -31, -26, -21, -16, -11, -6, -1])
         self.depth_history_length = 1 if origin else 37
         self.command_lower = np.array([0., -.5 if origin else 0., -1.57])
@@ -122,10 +134,10 @@ class HumanoidGaitDepthPolicy:
         # Exact 3x3, sigma=1 Gaussian with OpenCV BORDER_REFLECT_101 semantics.
         image = convolve1d(image, self._gaussian_kernel, axis=0, mode="mirror")
         image = convolve1d(image, self._gaussian_kernel, axis=1, mode="mirror")
-        maximum = 3. if self.mode == "origin_camera" else 2.5
-        image = (np.clip(image, .2, maximum) - .2) / (maximum - .2)
+        minimum, maximum = self.depth_range
+        image = (np.clip(image, minimum, maximum) - minimum) / (maximum - minimum)
         if self.mode == "origin_camera":
-            image = (image - .5)[2:38, :]
+            image = (image - .5)[self.crop_rows[0]:self.crop_rows[1], :]
         if image.shape != self.depth_shape:
             raise ValueError(f"Processed depth shape mismatch: {image.shape}")
         return np.ascontiguousarray(image, dtype=np.float32)

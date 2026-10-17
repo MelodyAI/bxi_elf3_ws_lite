@@ -27,7 +27,7 @@ from sensor_msgs.msg import Image, CameraInfo
 from bxi_example_py_elf3.models.depth_camera import DepthCameraInput
 from bxi_example_py_elf3.models.depth import HumanoidGaitDepthPolicy
 from bxi_example_py_elf3.model_config import (
-    DEPTH_WALK_ENABLED, DEPTH_CAMERA_NAME, DEPTH_CAMERA_STREAM, DEPTH_WALK_MODE, DEPTH_TIMEOUT_S, get_model_file_dicts,
+    DEPTH_WALK_ENABLED, DEPTH_CAMERA_NAME, DEPTH_CAMERA_STREAM, DEPTH_WALK_MODE, DEPTH_WALK_PREPROCESS, DEPTH_TIMEOUT_S, get_model_file_dicts,
 )
 
 if not DEPTH_WALK_ENABLED:
@@ -40,8 +40,9 @@ camera = subprocess.Popen(['ros2', 'launch', 'bxi_example_py_elf3', 'depth_camer
 node = None
 try:
     _, models = get_model_file_dicts()
-    policy = HumanoidGaitDepthPolicy(models['depth_walk'], mode=DEPTH_WALK_MODE)
-    receiver = DepthCameraInput(mode=DEPTH_WALK_MODE, timeout_s=DEPTH_TIMEOUT_S)
+    policy = HumanoidGaitDepthPolicy(models['depth_walk'], mode=DEPTH_WALK_MODE, **DEPTH_WALK_PREPROCESS)
+    receiver = DepthCameraInput(mode=DEPTH_WALK_MODE, timeout_s=DEPTH_TIMEOUT_S,
+                                depth_range=DEPTH_WALK_PREPROCESS.get('depth_range'))
     rclpy.init()
     node = rclpy.create_node('check_d435i_depth_policy')
     samples, timings, targets, control_times, depth_updates = [], [], [], [], []
@@ -103,6 +104,7 @@ try:
               'encoding': msg.encoding, 'resolution': [msg.width,msg.height],
               'filtered_depth_valid_ratio': float(np.mean(raw > 0)),
               'projection_roi': receiver.last_crop, 'model': policy.model_onnx_path,
+              'depth_preprocess': {'crop_rows':policy.crop_rows, 'depth_range':policy.depth_range},
               'policy_input_shape': list(policy.depth_input_buffer.shape),
               'policy_input_range': [float(policy.depth_input_buffer.min()),float(policy.depth_input_buffer.max())],
               'inference_frames': len(targets), 'inference_ms_p99': float(np.percentile(timings,99)),

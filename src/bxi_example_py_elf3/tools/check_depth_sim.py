@@ -20,7 +20,7 @@ from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image,CameraInfo
 from nav_msgs.msg import Odometry
 from bxi_example_py_elf3.bxi_example_dance import BxiExample,motionType
-from bxi_example_py_elf3.model_config import get_model_file_dicts, get_simulation_model_file, DEPTH_CAMERA_NAME, DEPTH_WALK_MODE
+from bxi_example_py_elf3.model_config import get_model_file_dicts, get_simulation_model_file, DEPTH_CAMERA_NAME, DEPTH_WALK_MODE, DEPTH_WALK_PREPROCESS
 from bxi_example_py_elf3 import model_config
 from bxi_example_py_elf3.utils.simulation_xml import generate_simulation_xml
 import communication.msg as messages
@@ -41,6 +41,7 @@ if options.depth_source == 'd435i':
 sim=subprocess.Popen([str(simulator/'lib/mujoco/simulation'),'--ros-args','-p',f'simulation/model_file:={model_file}'],stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
 npz,onnx=get_model_file_dicts()
 args=['--ros-args','-p','/use_hardware:=false','-p','/topic_prefix:=simulation/','-p','/depth_walk_enabled:=true','-p','/depth_walk_mode:='+DEPTH_WALK_MODE,'-p','/depth_camera_name:='+DEPTH_CAMERA_NAME,'-p','/rgmt_reference_mode:=npz','-p','/npz_file_dict:='+repr(json.dumps(npz)),'-p','/onnx_file_dict:='+repr(json.dumps(onnx))]
+args.extend(['-p','/depth_preprocess:='+repr(json.dumps(DEPTH_WALK_PREPROCESS))])
 node=None;executor=None
 try:
  if options.depth_source == 'd435i':
@@ -134,7 +135,8 @@ try:
  assert not node.fall_protection_latched
  report={'reset_steps_acknowledged':[step for step,_,_ in resets],'root_z_range_m':np.ptp(np.asarray(poses)[:,2]).item(),'joint_feedback_error_norm':np.linalg.norm(node.qpos-node.depth_walk.default_dof_pos).item(),'camera_frames':len(received),'camera_width':received[-1][1],'camera_height':received[-1][2],'encoding':received[-1][3],'camera_hz':(len(received)-1)/(received[-1][0]-received[0][0]),'depth_motor_frames':len(depth_outputs),'inference_ms_p99':float(np.percentile(timings,99)),'projection_roi':node.depth_camera.last_crop,'processed_depth_shape':node.depth_walk.depth_input_buffer.shape,'B_entry_B_exit_A_exit':'passed','timeout_fallback_and_stale_entry_rejection':'passed','fall_latch':node.fall_protection_latched,'walk_displacement_m':walk_delta.tolist(),'active_hidden_state_norm':hidden_norm,'model':node.depth_walk.model_onnx_path}
  report.update(depth_source=options.depth_source,simulation_model_file=model_file,
-  simulator_prefix=str(simulator),robot_hardware_started=False,depth_sensitivity=sensitivity)
+  simulator_prefix=str(simulator),robot_hardware_started=False,depth_sensitivity=sensitivity,
+  depth_preprocess={'crop_rows':node.depth_walk.crop_rows,'depth_range':node.depth_walk.depth_range})
  np.savez_compressed(out/'feedback.npz',positions=np.asarray(poses),
   target_times=np.asarray([row[0] for row in outputs]),
   targets=np.asarray([row[2] for row in outputs]),inference_ms=np.asarray(timings))

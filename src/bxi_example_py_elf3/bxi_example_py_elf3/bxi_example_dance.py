@@ -148,9 +148,11 @@ class BxiExample(Node):
         self._depth_last_target = None
         if self.depth_walk_enabled:
             from bxi_example_py_elf3.models.depth import HumanoidGaitDepthPolicy
-            self.depth_walk = HumanoidGaitDepthPolicy(self.onnx_file_dict["depth_walk"], mode=self.depth_walk_mode)
+            self.depth_walk = HumanoidGaitDepthPolicy(self.onnx_file_dict["depth_walk"], mode=self.depth_walk_mode,
+                                                      **self.depth_preprocess)
             print(f"Depth walking: mode={self.depth_walk_mode}, model={self.onnx_file_dict['depth_walk']}, "
-                  f"camera={self.depth_camera_name}, B enters/exits, A returns to AMP")
+                  f"camera={self.depth_camera_name}, crop_rows={self.depth_walk.crop_rows}, "
+                  f"depth_range={self.depth_walk.depth_range}, B enters/exits, A returns to AMP")
         
         self.rgmt = None
         self.neural_rgmt = None
@@ -1095,6 +1097,10 @@ class BxiExample(Node):
         self.depth_walk_enabled = bool(self.get_parameter('/depth_walk_enabled').value)
         self.declare_parameter('/depth_walk_mode', 'origin_camera')
         self.depth_walk_mode = str(self.get_parameter('/depth_walk_mode').value)
+        self.declare_parameter('/depth_preprocess', '{}')
+        self.depth_preprocess = json.loads(self.get_parameter('/depth_preprocess').value)
+        if not isinstance(self.depth_preprocess, dict) or set(self.depth_preprocess) - {'crop_rows', 'depth_range'}:
+            raise ValueError('depth_preprocess accepts crop_rows and depth_range')
         self.declare_parameter('/depth_camera_name', 'body_depth_camera')
         self.depth_camera_name = str(self.get_parameter('/depth_camera_name').value)
         self.declare_parameter('/depth_timeout_s', .5)
@@ -1117,7 +1123,8 @@ class BxiExample(Node):
         self.depth_camera = None
         if self.depth_walk_enabled:
             from bxi_example_py_elf3.models.depth_camera import DepthCameraInput
-            self.depth_camera = DepthCameraInput(mode=self.depth_walk_mode, timeout_s=self.depth_timeout_s)
+            self.depth_camera = DepthCameraInput(mode=self.depth_walk_mode, timeout_s=self.depth_timeout_s,
+                                                depth_range=self.depth_preprocess.get('depth_range'))
             base = self.topic_prefix.rstrip('/') + '/' + self.depth_camera_name
             self.depth_callback_group = MutuallyExclusiveCallbackGroup()
             self.depth_info_sub = self.create_subscription(sensor_msgs.msg.CameraInfo,

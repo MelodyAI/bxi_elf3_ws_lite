@@ -8,7 +8,7 @@ import json
 
 from bxi_example_py_elf3.model_config import (
     RGMT_REFERENCE_MODE, PICO_POSE_ENDPOINT, PICO_UMR_PREDICTION_TIME_S, get_model_file_dicts,
-    DEPTH_WALK_ENABLED, DEPTH_WALK_MODE, DEPTH_CAMERA_NAME, DEPTH_TIMEOUT_S, get_simulation_model_file,
+    DEPTH_WALK_ENABLED, DEPTH_WALK_MODE, DEPTH_WALK_PREPROCESS, DEPTH_CAMERA_NAME, DEPTH_TIMEOUT_S, get_simulation_model_file,
 )
 from bxi_example_py_elf3.pico_launch import make_pico_launch_actions
 
@@ -44,6 +44,7 @@ def generate_launch_description():
                     {"/pico_umr_prediction_time_s": PICO_UMR_PREDICTION_TIME_S},
                     {"/depth_walk_enabled": DEPTH_WALK_ENABLED},
                     {"/depth_walk_mode": DEPTH_WALK_MODE},
+                    {"/depth_preprocess": json.dumps(DEPTH_WALK_PREPROCESS)},
                     {"/depth_camera_name": DEPTH_CAMERA_NAME},
                     {"/depth_timeout_s": DEPTH_TIMEOUT_S},
                     {"/npz_file_dict": json.dumps(npz_file_dict)},
