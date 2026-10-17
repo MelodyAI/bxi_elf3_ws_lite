@@ -73,6 +73,39 @@ def test_bad_camera_and_images_do_not_refresh_depth_and_duplicates_expire(monkey
     assert 'incomplete' in receiver.last_error
 
 
+def test_thirty_hz_camera_selects_twenty_hz_depth_on_fifty_hz_control(monkeypatch):
+    import bxi_example_py_elf3.models.depth_camera as module
+    now = [1000.]
+    monkeypatch.setattr(module.time, 'monotonic', lambda: now[0])
+    receiver = DepthCameraInput()
+    receiver.camera_info_callback(info(8, 6))
+    selected_ticks = []
+    last_received = last_selected = None
+    for tick in range(500):
+        now[0] = 1000. + tick/50.
+        source_frame = tick*30//50
+        if source_frame != last_received:
+            receiver.image_callback(image(np.full((6,8), 1000, np.uint16), stamp=source_frame+1))
+            last_received = source_frame
+        before = receiver._next_sample_at
+        assert receiver.sample(advance=False) is not None
+        assert receiver._next_sample_at == before  # Readiness probes do not commit selection.
+        sample = receiver.sample()
+        if sample[1] != last_selected:
+            selected_ticks.append(tick)
+            last_selected = sample[1]
+    assert len(selected_ticks) == 200
+    assert set(np.diff(selected_ticks)) == {2, 3}
+    now[0] = 1050.
+    assert receiver.sample() is None
+    receiver.image_callback(image(np.full((6,8), 1000, np.uint16), stamp=1001))
+    latest = receiver.sample()
+    assert receiver._next_sample_at > now[0]
+    assert receiver.sample() is latest
+    receiver.reset_policy_sampling()
+    assert receiver._next_sample_at is None
+
+
 @pytest.mark.parametrize('filename,mode', [('dagger2.onnx', 'origin_camera'),
     ('dagger_new_position.onnx', 'origin_camera'), ('normal_depth.onnx', 'depth_walk')])
 def test_matches_original_mod_targets_and_inputs(filename, mode):
@@ -153,7 +186,7 @@ def test_generated_xml_preserves_physics_and_camera_mount(tmp_path, profile, ang
     np.testing.assert_allclose(data.cam_xmat[camera].reshape(3, 3), expected.as_matrix(), atol=1e-7)
     sensor = mujoco.mj_name2id(depth, mujoco.mjtObj.mjOBJ_SENSOR, settings['name'])
     np.testing.assert_allclose(depth.sensor_user[sensor, :11],
-        [640, 360, 43.173360, 848, 480, 58.605976, 30, 1, .1, 10., 1])
+        [640, 360, 43.173360, 848, 480, 58.605976, settings['stream']['fps'], 1, .1, 10., 1])
 
 
 def test_config_controls_generated_scene_and_disabled_depth(tmp_path, monkeypatch):

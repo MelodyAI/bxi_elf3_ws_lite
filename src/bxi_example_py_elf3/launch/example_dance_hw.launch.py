@@ -8,14 +8,17 @@ import json
 
 from bxi_example_py_elf3.model_config import (
     RGMT_REFERENCE_MODE, PICO_POSE_ENDPOINT, PICO_UMR_PREDICTION_TIME_S, get_model_file_dicts,
+    DEPTH_WALK_ENABLED, DEPTH_WALK_MODE, DEPTH_CAMERA_NAME, DEPTH_TIMEOUT_S,
 )
 from bxi_example_py_elf3.pico_launch import make_pico_launch_actions
+from bxi_example_py_elf3.depth_launch import make_depth_camera_launch_actions
 
 def generate_launch_description():
 
     npz_file_dict, onnx_file_dict = get_model_file_dicts()
 
     actions = make_pico_launch_actions()
+    actions.extend(make_depth_camera_launch_actions())
     actions.extend([
             Node(
                 package="hardware_elf3",
@@ -40,6 +43,10 @@ def generate_launch_description():
                     {"/rgmt_reference_mode": RGMT_REFERENCE_MODE},
                     {"/pico_pose_endpoint": PICO_POSE_ENDPOINT},
                     {"/pico_umr_prediction_time_s": PICO_UMR_PREDICTION_TIME_S},
+                    {"/depth_walk_enabled": DEPTH_WALK_ENABLED},
+                    {"/depth_walk_mode": DEPTH_WALK_MODE},
+                    {"/depth_camera_name": DEPTH_CAMERA_NAME},
+                    {"/depth_timeout_s": DEPTH_TIMEOUT_S},
                     {"/npz_file_dict": json.dumps(npz_file_dict)},
                     {"/onnx_file_dict": json.dumps(onnx_file_dict)},
                 ],

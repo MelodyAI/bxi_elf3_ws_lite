@@ -1,0 +1,6 @@
+pyrealsense2/__init__.py,sha256=1_yXDTxC25VfPsHNKqr_kg7dj3ftW4HDLibK-od9dC8,86
+pyrealsense2/pyrealsense2.cpython-310-x86_64-linux-gnu.so,sha256=HgdcV0C7aFs5OWKJy2NrZnnCzksMfZXFB33FRceYgqA,24662608
+pyrealsense2-2.58.1.10581.dist-info/METADATA,sha256=2kg8LiF2xRJXzByGb8krP145eEuO8xEu7o1zXN6tC1U,1895
+pyrealsense2-2.58.1.10581.dist-info/WHEEL,sha256=w_peljdKLMrsB3mlO3VUzyIfYcO9NmomDhWftCIc01g,99
+pyrealsense2-2.58.1.10581.dist-info/licenses/LICENSE,sha256=x6of3w44xIJ_7xeFndv6yAC4mV8-yHWgbdI8eRNflW0,11352
+pyrealsense2-2.58.1.10581.dist-info/RECORD,,

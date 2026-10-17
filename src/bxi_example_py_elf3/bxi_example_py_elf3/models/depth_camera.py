@@ -27,7 +27,7 @@ class DepthCameraInput:
         self._received_at = None
         self._last_stamp = None
         self._selected = None
-        self._selected_at = None
+        self._next_sample_at = None
         self.last_error = "Waiting for CameraInfo and depth image"
         self.last_crop = None
 
@@ -93,16 +93,23 @@ class DepthCameraInput:
         with self._lock:
             if self._received_at is None or now - self._received_at > self.timeout_s:
                 return None
-            if self._selected is None or self._selected_at is None or now - self._selected_at >= self.update_period_s:
+            if self._selected is None or self._next_sample_at is None or now + 1e-9 >= self._next_sample_at:
                 if advance:
-                    self._selected, self._selected_at = self._latest, now
+                    self._selected = self._latest
+                    if self._next_sample_at is None:
+                        self._next_sample_at = now + self.update_period_s
+                    else:
+                        # Advance the scheduled deadline, not the control tick.
+                        # At 50Hz this alternates 2/3 ticks for a true 20Hz average.
+                        periods = int(max(0., now-self._next_sample_at+1e-9) / self.update_period_s) + 1
+                        self._next_sample_at += periods * self.update_period_s
                 else:
                     return self._latest
             return self._selected
 
     def reset_policy_sampling(self):
         with self._lock:
-            self._selected = self._selected_at = None
+            self._selected = self._next_sample_at = None
 
     def age_ms(self):
         with self._lock:

@@ -108,6 +108,7 @@ setup(
         'console_scripts': [
             'bxi_example_py_elf3 = bxi_example_py_elf3.bxi_example:main',
             'bxi_example_py_elf3_dance = bxi_example_py_elf3.bxi_example_dance:main',
+            'd435i_camera = bxi_example_py_elf3.d435i_camera:main',
             'pico_pose_sender = bxi_example_py_elf3.pico_pose_sender:main',
         ],
     },

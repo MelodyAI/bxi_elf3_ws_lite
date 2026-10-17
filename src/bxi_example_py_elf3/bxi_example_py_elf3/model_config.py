@@ -20,7 +20,7 @@ PICO_POSE_ENDPOINT = "tcp://127.0.0.1:28704"
 # 80 ms 衰减时间常数的限幅预测，无需等待未来帧；设为 0 可对照保持模式。
 PICO_UMR_PREDICTION_TIME_S = float(os.environ.get("PICO_UMR_PREDICTION_TIME_S", "0.08"))
 
-# 仿真 B 键：深度行走；A 键回普通 AMP，B 再按一次也可退出。
+# 仿真／真机 B 键：深度行走；A 键回普通 AMP，B 再按一次也可退出。
 DEPTH_WALK_ENABLED = True
 # DEPTH_WALK_ENABLED = False
 DEPTH_WALK_MODEL = "dagger_new_position"  # 最新腰部相机65°；旧模型 dagger2 / normal_depth
@@ -51,6 +51,16 @@ DEPTH_CAMERA_STREAM = {
     "min_distance_m": 0.1, "max_distance_m": 10.0, "preview_enabled": True,
 }
 DEPTH_TIMEOUT_S = 0.5
+
+# 真机 launch 自动启动独立 D435i 节点；仅相机 SDK 放入 third_party，推理库使用已有环境。
+# 深度沿用上面的采集和发布 FPS；保留真实内参，策略按 20Hz 选择深度输入。
+# 多台 D435i 时必须填写 serial_no；单台留空自动选择，不绑定开发机序列号。
+DEPTH_CAMERA_HARDWARE = {
+    "serial_no": "", "color_enabled": False,
+    # FOV小图 + Instinct NS补洞，只修复无效深度点。
+    "invalid_below_m": 0.2, "inpaint_radius_px": 3.0,
+    "reconnect_s": 2.0, "frame_timeout_s": 1.0,
+}
 
 # 仿真XML以原Lite模型为基础，启动时注入上面的相机和下面的场景参数。
 SIMULATION_MODEL_XML = "robot/elf3_lite/xml/elf3.xml"

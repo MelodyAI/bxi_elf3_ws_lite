@@ -122,17 +122,26 @@ python3 src/bxi_example_py_elf3/test_neural_retarget_accad.py \
 
 当前仿真支持 **B 键深度行走**，默认使用 `dagger_new_position.onnx` 和最新腰部
 向下 65° 相机。先按 A 启动普通行走，再按 B 切换；B 再按一次或 A 返回普通行走。
-请先 `source /home/szz/bxi/bxi_ros2_pkg/setup.bash` 使用带深度输出的新 MuJoCo 包，
+请先 `source /opt/bxi/bxi_ros2_pkg/setup.bash` 使用带深度输出的 MuJoCo 包，
 再 `source install/local_setup.bash`。模型与相机绑定、配置及验证见 [深度行走部署](docs/depth_walk.md)。
 
 ```bash
 cd /home/szz/bxi/bxi_elf3_ws_lite
-source /home/szz/bxi/bxi_ros2_pkg/setup.bash
+source /opt/bxi/bxi_ros2_pkg/setup.bash
 source install/local_setup.bash
 ros2 launch bxi_example_py_elf3 example_dance.launch.py
 ```
 
 ## sim2real
+
+`model_config.py` 中设 `DEPTH_WALK_ENABLED=True` 后，真机 launch 自动启动包内
+D435i 相机节点，并把真实深度图送入所选深度策略。仅相机 SDK 核心放入
+`src/bxi_example_py_elf3/third_party/realsense`，约 24 MB，适用于 Ubuntu 22.04 /
+x86_64 / Python 3.10。NumPy、SciPy、ONNX、ONNX Runtime 直接复用现有环境。
+无需另外安装相机驱动、SDK 或 ROS 相机包。沿用下面的 root 部署流程。
+默认腰部相机向下 65°；先 A 普通行走，再 B 深度行走。相机单独检查、安装位姿及
+断流回退行为见 [深度行走部署](docs/depth_walk.md)。
+
 ```bash
 sudo su
 source /opt/bxi/bxi_ros2_pkg/setup.bash

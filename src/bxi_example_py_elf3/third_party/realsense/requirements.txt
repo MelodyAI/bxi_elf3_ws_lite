@@ -1,0 +1,2 @@
+# Official SDK wheel includes librealsense; no system SDK is loaded.
+pyrealsense2==2.58.1.10581

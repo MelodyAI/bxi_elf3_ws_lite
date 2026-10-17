@@ -497,6 +497,7 @@ class BxiExample(Node):
         self._old_action = None
         self._blend_pending = False
         self.vx = self.vy = self.dyaw = 0.0
+        self._depth_reentry_required = True
         self.depth_walk.reset()
         self.depth_camera.reset_policy_sampling()
         self._depth_last_target = None
@@ -520,6 +521,7 @@ class BxiExample(Node):
         self.depth_walk.reset()
         self.depth_camera.reset_policy_sampling()
         self._depth_last_target = None
+        self._depth_reentry_required = False
         previous_motion = self.motion_type
         self.motion_type = motionType.depth_walk
         self.start_motion_transition(previous_motion)
@@ -543,6 +545,8 @@ class BxiExample(Node):
    
             self.vy = msg.vel_des.y
             self.dyaw = msg.yawdot_des
+            if self._depth_reentry_required:
+                self.vx = self.vy = self.dyaw = 0.0
 
             motion_a = msg.btn_5 # A
             motion_x = msg.btn_6 # X
@@ -598,8 +602,9 @@ class BxiExample(Node):
             use_button1 = True
             
             if use_button1: 
-                # A：普通行走，X：动作跟踪，Y：躺下/起身，B：仿真深度行走
+                # A：普通行走，X：动作跟踪，Y：躺下/起身，B：深度行走（启用时）
                 if self.motion_a_changed == 1:
+                    self._depth_reentry_required = False
                     if self.step < 2:
                         self.robot_reset(2, True) # first reset
                         self.step = 2
@@ -1087,7 +1092,7 @@ class BxiExample(Node):
         # self.declare_parameter('/transition_time', 0.6)
         self._param_transition_time = float(self.get_parameter('/transition_time').value)
         self.declare_parameter('/depth_walk_enabled', False)
-        self.depth_walk_enabled = bool(self.get_parameter('/depth_walk_enabled').value) and not self.use_hardware
+        self.depth_walk_enabled = bool(self.get_parameter('/depth_walk_enabled').value)
         self.declare_parameter('/depth_walk_mode', 'origin_camera')
         self.depth_walk_mode = str(self.get_parameter('/depth_walk_mode').value)
         self.declare_parameter('/depth_camera_name', 'body_depth_camera')
@@ -1138,6 +1143,7 @@ class BxiExample(Node):
         self.vx = 0.0
         self.vy = 0.0
         self.dyaw = 0.0
+        self._depth_reentry_required = False
         self.stand_height = 1.0
         
         # 速度偏移变量
