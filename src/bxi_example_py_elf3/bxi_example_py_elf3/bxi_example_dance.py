@@ -28,7 +28,7 @@ from bxi_example_py_elf3.models.rgmt import RgmtExternalReferencePolicy
 from bxi_example_py_elf3.models.neural_rgmt import NeuralRetargetRGMT
 from bxi_example_py_elf3.models.accad_smplx import AccadSmplxMotion
 from bxi_example_py_elf3.models.pico_human_client import PicoHumanPoseClient
-from bxi_example_py_elf3.models.beyondmimic import DanceMotionPolicyGravityIsaaclabV3
+from bxi_example_py_elf3.models.beyondmimic import DanceMotionPolicyGravityIsaaclabV2 ,DanceMotionPolicyGravityIsaaclabV3
 from bxi_example_py_elf3.models.amp import  HumanoidGaitPolicyLite
 from bxi_example_py_elf3.utils.tfs import get_gravity_orientation
 
@@ -92,6 +92,9 @@ class motionType:
     dance_getup_face = 5
     dance_getup_back = 6
     rgmt_neural = 7
+    depth_walk = 8
+    
+    dance_mimic = 9
      
 
 class BxiExample(Node):
@@ -141,6 +144,13 @@ class BxiExample(Node):
         # AMP模型
         self.amp_run = HumanoidGaitPolicyLite(self.onnx_file_dict["amp_run"])
         self.amp_walk = HumanoidGaitPolicyLite(self.onnx_file_dict["amp_walk"])
+        self.depth_walk = None
+        self._depth_last_target = None
+        if self.depth_walk_enabled:
+            from bxi_example_py_elf3.models.depth import HumanoidGaitDepthPolicy
+            self.depth_walk = HumanoidGaitDepthPolicy(self.onnx_file_dict["depth_walk"], mode=self.depth_walk_mode)
+            print(f"Depth walking: mode={self.depth_walk_mode}, model={self.onnx_file_dict['depth_walk']}, "
+                  f"camera={self.depth_camera_name}, B enters/exits, A returns to AMP")
         
         self.rgmt = None
         self.neural_rgmt = None
@@ -216,6 +226,8 @@ class BxiExample(Node):
         self.dance_lie_down = DanceMotionPolicyGravityIsaaclabV3(self.npz_file_dict["lie_down"], self.onnx_file_dict["lie_down"], start_frame=160,fixed_pos=True)#fixed policy
         self.dance_getup_face = DanceMotionPolicyGravityIsaaclabV3(self.npz_file_dict["getup_face"], self.onnx_file_dict["getup_face"], start_frame=1, fixed_pos=False)#fixed policy
         self.dance_getup_back = DanceMotionPolicyGravityIsaaclabV3(self.npz_file_dict["getup_back"], self.onnx_file_dict["getup_back"], start_frame=1, fixed_pos=False)#fixed policy
+        
+        self.dance_mimic = DanceMotionPolicyGravityIsaaclabV3(self.npz_file_dict["cxk"], self.onnx_file_dict["cxk"], start_frame=1, fixed_pos=True)#fixed policy
 
         self.dance_lie_down.end_frame = self.dance_lie_down.end_frame - 190
 
@@ -409,6 +421,22 @@ class BxiExample(Node):
                     with_cmd_vel=True,
                     transition_time=0.0,
                 )
+        
+        if self.motion_type == motionType.dance_mimic:
+            if self.dance_mimic.timestep <= self.dance_mimic.end_frame:
+                self.target_dof_pos = self.dance_mimic.inference_step(q, dq, quat, omega)
+                # 发布关节控制指令
+                self.send_to_motor(self.target_dof_pos, self.dance_mimic.kps, self.dance_mimic.kds)
+                
+            # 动作管理
+            if self.dance_flag==1:
+                self.dance_mimic.timestep += 1
+                
+            # 动作结束检测
+            if self.dance_mimic.timestep > self.dance_mimic.end_frame:
+                # 躺下结束后保持末帧，等待再次按 Y 键触发起身。
+                self.dance_mimic.timestep = self.dance_mimic.end_frame
+        
                       
         if self.motion_type == motionType.dance_lie_down:
             if self.dance_lie_down.timestep <= self.dance_lie_down.end_frame:
@@ -434,6 +462,68 @@ class BxiExample(Node):
             # print("AMP running...")
             self.target_dof_pos = self.amp_run.inference_step(q, dq, quat, omega, cmd_vel)
             self.send_to_motor(self.target_dof_pos, self.amp_run.kps, self.amp_run.kds)    
+
+        if self.motion_type == motionType.depth_walk:
+            # During an outgoing transition reuse the last committed frame;
+            # previews must not advance proprio/depth history or recurrent state.
+            if self._capture_motor:
+                target = self._depth_last_target
+                if target is None:
+                    target = self.depth_walk.default_dof_pos
+            else:
+                sample = self.depth_camera.sample()
+                if sample is None:
+                    self._stop_depth_walk("Depth image unavailable/timeout")
+                    target = self.amp_walk.inference_step(q, dq, quat, omega, np.zeros(3, np.float32))
+                    self.target_dof_pos = target
+                    self.send_to_motor(target, self.amp_walk.kps, self.amp_walk.kds)
+                    return
+                try:
+                    target = self.depth_walk.inference_step(q, dq, quat, omega, cmd_vel, *sample)
+                except (ValueError, RuntimeError) as error:
+                    self._stop_depth_walk(f"Depth inference failed: {error}")
+                    target = self.amp_walk.inference_step(q, dq, quat, omega, np.zeros(3, np.float32))
+                    self.target_dof_pos = target
+                    self.send_to_motor(target, self.amp_walk.kps, self.amp_walk.kds)
+                    return
+                self._depth_last_target = target.copy()
+            self.target_dof_pos = target
+            self.send_to_motor(target, self.depth_walk.kps, self.depth_walk.kds)
+
+    def _stop_depth_walk(self, reason):
+        self.motion_type = motionType.amp_walk
+        self.transition_active = False
+        self.prev_motion_type = None
+        self._old_action = None
+        self._blend_pending = False
+        self.vx = self.vy = self.dyaw = 0.0
+        self.depth_walk.reset()
+        self.depth_camera.reset_policy_sampling()
+        self._depth_last_target = None
+        self.get_logger().warning(f"{reason}; returning to AMP with zero command; press B to re-enter")
+
+    def toggle_depth_walk(self):
+        if not self.depth_walk_enabled or self.depth_walk is None:
+            self.get_logger().warning("Depth walking is not enabled in this launch")
+            return
+        if self.motion_type == motionType.depth_walk:
+            self.switch_to_motion(self.amp_walk, motionType.amp_walk, num=20, with_cmd_vel=True)
+            return
+        if self.step < 2 or self.fall_protection_latched or self._getup_ramp_active:
+            return
+        if self.motion_type not in (motionType.amp_walk, motionType.amp_run):
+            self.get_logger().warning("Press A to return to walking before entering depth mode")
+            return
+        if self.depth_camera.sample(advance=False) is None:
+            self.get_logger().warning(f"Depth not ready: {self.depth_camera.last_error or 'image timeout'}")
+            return
+        self.depth_walk.reset()
+        self.depth_camera.reset_policy_sampling()
+        self._depth_last_target = None
+        previous_motion = self.motion_type
+        self.motion_type = motionType.depth_walk
+        self.start_motion_transition(previous_motion)
+        print("B: depth walking started", flush=True)
      
     def _pico_wait_balance(self, q, dq, quat, omega):
         # A fixed PD joint pose is not a balance controller. Continue running
@@ -446,7 +536,7 @@ class BxiExample(Node):
 
     def joy_callback(self, msg):
         with self.lock_in:
-            if self.motion_type == motionType.amp_walk:
+            if self.motion_type in (motionType.amp_walk, motionType.depth_walk):
                 self.vx = np.clip(msg.vel_des.x, -0.6, 1.0)
             else:
                 self.vx = np.clip(msg.vel_des.x, -1.0, 5.0)
@@ -508,7 +598,7 @@ class BxiExample(Node):
             use_button1 = True
             
             if use_button1: 
-                # 常用按键组合：A键切换amp_walk，X/Y/B键切换三个舞蹈动作
+                # A：普通行走，X：动作跟踪，Y：躺下/起身，B：仿真深度行走
                 if self.motion_a_changed == 1:
                     if self.step < 2:
                         self.robot_reset(2, True) # first reset
@@ -564,9 +654,22 @@ class BxiExample(Node):
                     
 
                 elif self.motion_b_changed == 1:
+                    if self.depth_walk_enabled:
+                        self.toggle_depth_walk()
+                    else:
+                        # self.switch_to_motion(self.amp_run, motionType.amp_run, num=20, with_cmd_vel=True)
 
-                    self.switch_to_motion(self.amp_run, motionType.amp_run, num=20, with_cmd_vel=True)
-                                           
+                        #####
+                        self.dance_flag += 1
+                        if self.dance_flag > 1:
+                            self.dance_flag = 0
+                        if self.motion_type == motionType.amp_walk:
+                            self.dance_flag = 1
+                            self.dance_mimic.timestep = self.dance_mimic.start_frame
+                            self.dance_mimic.timeinit = 0.0
+                            self.switch_to_motion(self.dance_mimic, motionType.dance_mimic, num=20)
+                        ##### 
+                                            
     def send_to_motor(self, dof_pos_target, kps, kds):
         dof_pos_target = np.asarray(dof_pos_target, dtype=np.float32)
         kps = np.asarray(kps, dtype=np.float32)
@@ -724,11 +827,12 @@ class BxiExample(Node):
                 omega = self.omega
                 cmd_vel = np.array([self.vx, self.vy, self.dyaw])
 
-            # 只对 AMP 走路/跑步模型启用跌倒锁存。躺下和起身动作由
+            # 对 AMP 和深度行走启用跌倒锁存。躺下和起身动作由
             # Y 键流程管理，不能在这些动作期间被保护逻辑打断。
             walk_motion = self.motion_type in (
                 motionType.amp_walk,
                 motionType.amp_run,
+                motionType.depth_walk,
             )
             quat_valid = bool(np.all(np.isfinite(quat)) and np.linalg.norm(quat) > 0.5)
             gravity_body = get_gravity_orientation(quat) if quat_valid else None
@@ -982,6 +1086,14 @@ class BxiExample(Node):
         # self.declare_parameter('/transition_time', 0.5)
         # self.declare_parameter('/transition_time', 0.6)
         self._param_transition_time = float(self.get_parameter('/transition_time').value)
+        self.declare_parameter('/depth_walk_enabled', False)
+        self.depth_walk_enabled = bool(self.get_parameter('/depth_walk_enabled').value) and not self.use_hardware
+        self.declare_parameter('/depth_walk_mode', 'origin_camera')
+        self.depth_walk_mode = str(self.get_parameter('/depth_walk_mode').value)
+        self.declare_parameter('/depth_camera_name', 'body_depth_camera')
+        self.depth_camera_name = str(self.get_parameter('/depth_camera_name').value)
+        self.declare_parameter('/depth_timeout_s', .5)
+        self.depth_timeout_s = float(self.get_parameter('/depth_timeout_s').value)
         # print('onnx_file:')
         # for key,value in self.onnx_file_dict.items():
             # print("Load model from ",key,": ",value)
@@ -997,6 +1109,18 @@ class BxiExample(Node):
         self.imu_sub = self.create_subscription(sensor_msgs.msg.Imu, self.topic_prefix+'imu_data', self.imu_callback, qos)
         self.touch_sub = self.create_subscription(bxiMsg.TouchSensor, self.topic_prefix+'touch_sensor', self.touch_callback, qos)
         self.joy_sub = self.create_subscription(bxiMsg.MotionCommands, 'motion_commands', self.joy_callback, qos)
+        self.depth_camera = None
+        if self.depth_walk_enabled:
+            from bxi_example_py_elf3.models.depth_camera import DepthCameraInput
+            self.depth_camera = DepthCameraInput(mode=self.depth_walk_mode, timeout_s=self.depth_timeout_s)
+            base = self.topic_prefix.rstrip('/') + '/' + self.depth_camera_name
+            self.depth_callback_group = MutuallyExclusiveCallbackGroup()
+            self.depth_info_sub = self.create_subscription(sensor_msgs.msg.CameraInfo,
+                base + '/depth/camera_info', self.depth_camera.camera_info_callback, qos,
+                callback_group=self.depth_callback_group)
+            self.depth_image_sub = self.create_subscription(sensor_msgs.msg.Image,
+                base + '/depth/image_rect_raw', self.depth_camera.image_callback, qos,
+                callback_group=self.depth_callback_group)
 
         self.rest_srv = self.create_client(bxiSrv.RobotReset, self.topic_prefix+'robot_reset')
         self.sim_rest_srv = self.create_client(bxiSrv.SimulationReset, self.topic_prefix+'sim_reset')

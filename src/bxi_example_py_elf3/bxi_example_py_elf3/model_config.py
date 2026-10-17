@@ -4,9 +4,6 @@ from pathlib import Path
 import os
 import sys
 
-from ament_index_python.packages import get_package_share_path
-
-
 PACKAGE_NAME = "bxi_example_py_elf3"
 
 # Change this one value to select the reference source used by the X key.
@@ -23,6 +20,49 @@ PICO_POSE_ENDPOINT = "tcp://127.0.0.1:28704"
 # 80 ms 衰减时间常数的限幅预测，无需等待未来帧；设为 0 可对照保持模式。
 PICO_UMR_PREDICTION_TIME_S = float(os.environ.get("PICO_UMR_PREDICTION_TIME_S", "0.08"))
 
+# 仿真 B 键：深度行走；A 键回普通 AMP，B 再按一次也可退出。
+DEPTH_WALK_ENABLED = True
+# DEPTH_WALK_ENABLED = False
+DEPTH_WALK_MODEL = "dagger_new_position"  # 最新腰部相机65°；旧模型 dagger2 / normal_depth
+# 模型、图像契约与位姿一起选择。相机沿局部-Z看，生成器将视线俯角转换为四元数。
+DEPTH_WALK_PROFILES = {
+    "dagger2": {
+        "mode": "origin_camera", "position": (0.1152, 0.0175, -0.1358), "look_down_deg": 70.0,
+    },
+    "normal_depth": {
+        "mode": "depth_walk", "position": (0.1152, 0.0175, -0.1358), "look_down_deg": 70.0,
+    },
+    "dagger_new_position": {
+        "mode": "origin_camera", "position": (0.08599, 0.0175, -0.20651), "look_down_deg": 65.0,
+    },
+}
+DEPTH_WALK_MODE = DEPTH_WALK_PROFILES[DEPTH_WALK_MODEL]["mode"]
+DEPTH_CAMERA_NAME = "body_depth_camera"
+DEPTH_CAMERA_PARENT = "torso_link"
+DEPTH_CAMERA_POSE = {
+    "position": DEPTH_WALK_PROFILES[DEPTH_WALK_MODEL]["position"],
+    "look_down_deg": DEPTH_WALK_PROFILES[DEPTH_WALK_MODEL]["look_down_deg"],
+    "roll_deg": -90.0,  # 相机局部Z旋转，保持原策略的图像方向
+}
+DEPTH_CAMERA_STREAM = {
+    "color_width": 640, "color_height": 360, "color_fov_y_deg": 43.173360,
+    "depth_width": 848, "depth_height": 480, "depth_fov_y_deg": 58.605976,
+    "fps": 30.0, "depth_enabled": True,
+    "min_distance_m": 0.1, "max_distance_m": 10.0, "preview_enabled": True,
+}
+DEPTH_TIMEOUT_S = 0.5
+
+# 仿真XML以原Lite模型为基础，启动时注入上面的相机和下面的场景参数。
+SIMULATION_MODEL_XML = "robot/elf3_lite/xml/elf3.xml"
+SIMULATION_TERRAIN_ENABLED = False  # True：添加下列10/20 cm测试台阶
+SIMULATION_TERRAIN_STEPS = [
+    {"name": "depth_step_1", "position": (2.0, 0.0, 0.05), "size": (0.4, 0.8, 0.05)},
+    {"name": "depth_step_2", "position": (2.8, 0.0, 0.10), "size": (0.4, 0.8, 0.10)},
+    {"name": "depth_step_3", "position": (3.6, 0.0, 0.05), "size": (0.4, 0.8, 0.05)},
+]
+SIMULATION_TERRAIN_RGBA = (0.6, 0.55, 0.45, 1.0)
+SIMULATION_TERRAIN_FRICTION = (0.8, 0.01, 0.001)
+
 # PICO runtime is optional.  Set RGMT_REFERENCE_MODE to "pico" or "pico_umr" to enable
 # launch-managed service and sender processes.  A matching prebuilt runtime is
 # bundled under third_party/pico; external paths can still be configured.
@@ -38,6 +78,30 @@ PICO_SENDER_PYTHONPATH = os.environ.get("PICO_SENDER_PYTHONPATH", "")
 
 # Keep these paths relative to the installed package share directory.  Both
 # simulation and hardware launch files use the same dictionaries.
+ONNX_FILE_PATHS = {
+    "depth_walk": f"policy/depth_walk/{DEPTH_WALK_MODEL}.onnx",
+    "amp_walk": "policy/amp_dwaq3.onnx",##symmetry
+    # "amp_run": "policy/myrun6.onnx",##sim 5.5=6
+    "amp_run": "policy/myrun10.onnx",##hw 5=5.18
+    # "amp_run": "policy/myrun14.onnx",#run_dwaq
+
+    # "rgmt": "policy/rgmtr_125200.onnx",
+    # "rgmt": "policy/rgmtr_53600.onnx",
+    "rgmt": "policy/rgmtr_80000.onnx",
+
+    
+    "neural_retarget": "policy/neural_retarget_fast.onnx",
+    
+    # isaaclabv2
+    "lie_down": "policy/dance_isaaclab/lie_down.onnx",
+    "getup_face": "policy/dance_isaaclab/getup_face.onnx",
+    "getup_back": "policy/dance_isaaclab/getup_back.onnx",
+    
+    # "cxk": "policy/dance_isaaclab/cxk_2k.onnx",
+    "cxk": "policy/dance_isaaclab/cxk2_2w.onnx",
+    # "cxk": "policy/dance_isaaclab/cxk2_3k.onnx",
+}
+
 NPZ_FILE_PATHS = {
 
     # UMR 原始动作输入：选一个 NPZ/BVH 文件，无需预先转换。
@@ -147,28 +211,32 @@ NPZ_FILE_PATHS = {
     "lie_down": "policy/dance_isaaclab/lie_down.npz",
     "getup_face": "policy/dance_isaaclab/getup_face.npz",
     "getup_back": "policy/dance_isaaclab/getup_back.npz",
+    
+    # "cxk": "policy/dance_isaaclab/cxk.npz",
+    "cxk": "policy/dance_isaaclab/cxk2.npz",
 }
 
-ONNX_FILE_PATHS = {
-    "amp_walk": "policy/amp_dwaq3.onnx",##symmetry
-    # "amp_run": "policy/myrun6.onnx",##sim 5.5=6
-    "amp_run": "policy/myrun10.onnx",##hw 5=5.18
-    # "amp_run": "policy/myrun14.onnx",#run_dwaq
 
-    "rgmt": "policy/rgmtr_125200.onnx",
-
-    
-    "neural_retarget": "policy/neural_retarget_fast.onnx",
-    
-    # isaaclab3
-    "lie_down": "policy/dance_isaaclab/lie_down.onnx",
-    "getup_face": "policy/dance_isaaclab/getup_face.onnx",
-    "getup_back": "policy/dance_isaaclab/getup_back.onnx",
-}
+def get_simulation_model_file(*, package_share_dir=None, output_dir=None):
+    """Apply the camera and scene settings above to the original robot MJCF."""
+    from .utils.simulation_xml import generate_simulation_xml
+    if package_share_dir is None:
+        from ament_index_python.packages import get_package_share_path
+        package_share_dir = get_package_share_path(PACKAGE_NAME)
+    share_dir = Path(package_share_dir)
+    camera = None
+    if DEPTH_WALK_ENABLED:
+        camera = dict(name=DEPTH_CAMERA_NAME, parent=DEPTH_CAMERA_PARENT,
+                      stream=DEPTH_CAMERA_STREAM, **DEPTH_CAMERA_POSE)
+    return generate_simulation_xml(share_dir / SIMULATION_MODEL_XML, camera=camera,
+        terrain_steps=SIMULATION_TERRAIN_STEPS if SIMULATION_TERRAIN_ENABLED else (),
+        terrain_rgba=SIMULATION_TERRAIN_RGBA, terrain_friction=SIMULATION_TERRAIN_FRICTION,
+        output_dir=output_dir)
 
 
 def get_model_file_dicts():
     """Return absolute model paths for the installed package resources."""
+    from ament_index_python.packages import get_package_share_path
     share_dir = Path(get_package_share_path(PACKAGE_NAME))
     npz_file_dict = {
         key: str(share_dir / relative_path)
