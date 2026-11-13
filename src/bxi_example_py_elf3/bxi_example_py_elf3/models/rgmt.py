@@ -758,6 +758,7 @@ class RgmtExternalReferencePolicy:
             clipped_action = np.clip(self.raw_action, -self.action_clip, self.action_clip)
         self.action_buffer = clipped_action.astype(np.float32, copy=True)
         self.action = self.action_buffer.copy()
+        # print(self.calibration_offset)
         target_isaac = (
             reference_joint_pos_isaac
             + self.calibration_offset

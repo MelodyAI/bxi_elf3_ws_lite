@@ -229,7 +229,7 @@ class BxiExample(Node):
         self.dance_getup_face = DanceMotionPolicyGravityIsaaclabV3(self.npz_file_dict["getup_face"], self.onnx_file_dict["getup_face"], start_frame=1, fixed_pos=False)#fixed policy
         self.dance_getup_back = DanceMotionPolicyGravityIsaaclabV3(self.npz_file_dict["getup_back"], self.onnx_file_dict["getup_back"], start_frame=1, fixed_pos=False)#fixed policy
         
-        self.dance_mimic = DanceMotionPolicyGravityIsaaclabV3(self.npz_file_dict["cxk"], self.onnx_file_dict["cxk"], start_frame=1, fixed_pos=True)#fixed policy
+        self.dance_mimic = DanceMotionPolicyGravityIsaaclabV3(self.npz_file_dict["mimic"], self.onnx_file_dict["mimic"], start_frame=1, fixed_pos=True)#fixed policy
 
         self.dance_lie_down.end_frame = self.dance_lie_down.end_frame - 190
 

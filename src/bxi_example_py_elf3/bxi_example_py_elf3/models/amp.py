@@ -58,19 +58,46 @@ class HumanoidGaitPolicy:
         #     0.373, 0.373,         # r_wrist_y, r_wrist_z
         # ])
         
+        # self.action_scale = np.array([
+        #     0.231, 0.154, 0.213,
+        #     0.213, 0.213, 0.231, 0.213, 0.373, 0.230,
+        #     0.213, 0.213, 0.231, 0.213, 0.373, 0.230,
+        #     0.231, 0.231, 0.373, 0.231, 0.373, 0.373, 0.373,
+        #     0.231, 0.231, 0.373, 0.231, 0.373, 0.373, 0.373,
+        # ], dtype=np.float32)
+        
+        # train isaac right
+        # self.action_scale = np.array([
+        #     0.231, 0.231, 0.231,    # l_shoulder_y, r_shoulder_y, waist_y
+        #     0.231, 0.231, 0.154,    # l_shoulder_x, r_shoulder_x, waist_x
+        #     0.373, 0.373, 0.213,    # l_shoulder_z, r_shoulder_z, waist_z
+        #     0.231, 0.231,           # l_elbow_y, r_elbow_y
+        #     0.213, 0.213,           # l_hip_y, r_hip_y 
+        #     0.373, 0.373,           # l_wrist_x, r_wrist_x
+        #     0.213, 0.213,           # l_hip_x, r_hip_x
+        #     0.373, 0.373,           # l_wrist_y, r_wrist_y
+        #     0.231, 0.231,           # l_hip_z, r_hip_z
+        #     0.373, 0.373,           # l_wrist_z, r_wrist_z
+        #     0.213, 0.213,           # l_knee_y, r_knee_y
+        #     0.373, 0.373,           # l_ankle_y, r_ankle_y
+        #     0.230, 0.230            # l_ankle_x, r_ankle_x  
+        # ])
+        
         # revised scale
         self.action_scale = np.array([
-            0.231, 0.231, 0.231,
-            0.231, 0.231, 0.154,
-            0.373, 0.373, 0.213,
-            0.231, 0.231, 0.213,
-            0.213, 0.373, 0.373,
-            0.213, 0.213, 0.373, 
-            0.373, 0.231, 
-            0.231, 0.373, 
-            0.373, 0.213, 0.213, 
-            0.373, 0.373, 
-            0.23, 0.23
+            0.231, 0.231, 0.231,    # l_shoulder_y, r_shoulder_y, waist_y
+            0.231, 0.231, 0.154,    # l_shoulder_x, r_shoulder_x, waist_x
+            0.373, 0.373, 0.213,    # l_shoulder_z, r_shoulder_z, waist_z
+            0.231, 0.231,           # l_elbow_y, r_elbow_y
+            0.213, 0.213,           # l_hip_y, r_hip_y 
+            0.373, 0.373,           # l_wrist_x, r_wrist_x
+            0.213, 0.213,           # l_hip_x, r_hip_x
+            0.373, 0.373,           # l_wrist_y, r_wrist_y
+            0.231, 0.231,           # l_hip_z, r_hip_z
+            0.373, 0.373,           # l_wrist_z, r_wrist_z
+            0.213, 0.213,           # l_knee_y, r_knee_y
+            0.373, 0.373,           # l_ankle_y, r_ankle_y
+            0.230, 0.230            # l_ankle_x, r_ankle_x  
         ])
         
         #new version kp, kd

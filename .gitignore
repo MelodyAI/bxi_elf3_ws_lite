@@ -1,6 +1,7 @@
 build/
 install/
 log/
+bxi_ros_pkg/
 cmu_1h_new/
 cmu_orin/
 lafan1_npz/
