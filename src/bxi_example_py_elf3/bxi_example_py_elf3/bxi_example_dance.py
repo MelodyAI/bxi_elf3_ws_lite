@@ -431,7 +431,7 @@ class BxiExample(Node):
                 self.send_to_motor(self.target_dof_pos, self.dance_mimic.kps, self.dance_mimic.kds)
                 
             # 动作管理
-            if self.dance_flag==1:
+            if self.dance_flag == 1 and not self._dance_hold_frame:
                 self.dance_mimic.timestep += 1
                 
             # 动作结束检测
@@ -606,6 +606,7 @@ class BxiExample(Node):
             if use_button1: 
                 # A：普通行走，X：动作跟踪，Y：躺下/起身，B：深度行走（启用时）
                 if self.motion_a_changed == 1:
+                    self._cancel_dance_entry()
                     self._depth_reentry_required = False
                     if self.step < 2:
                         self.robot_reset(2, True) # first reset
@@ -616,6 +617,7 @@ class BxiExample(Node):
                         self.motion_type = motionType.amp_walk
 
                 elif self.motion_x_changed == 1:
+                    self._dance_prepare = None
                     self.dance_flag += 1
                     if self.dance_flag > 1:
                         self.dance_flag = 0
@@ -656,6 +658,7 @@ class BxiExample(Node):
                             self.switch_to_motion(self.rgmt, motionType.rgmt, num=20)
                        
                 elif self.motion_y_changed == 1:
+                    self._cancel_dance_entry()
                     # Y 键在站立时执行躺下，躺倒时根据身体朝向选择起身策略。
                     self.select_fall_getup_motion()
                     
@@ -664,18 +667,21 @@ class BxiExample(Node):
                     if self.depth_walk_enabled:
                         self.toggle_depth_walk()
                     else:
-                        # self.switch_to_motion(self.amp_run, motionType.amp_run, num=20, with_cmd_vel=True)
-
-                        #####
-                        self.dance_flag += 1
-                        if self.dance_flag > 1:
-                            self.dance_flag = 0
-                        if self.motion_type == motionType.amp_walk:
-                            self.dance_flag = 1
-                            self.dance_mimic.timestep = self.dance_mimic.start_frame
-                            self.dance_mimic.timeinit = 0.0
-                            self.switch_to_motion(self.dance_mimic, motionType.dance_mimic, num=20)
-                        ##### 
+                        if self._dance_prepare is not None:
+                            self._cancel_dance_entry()
+                            print("B: dance entry cancelled", flush=True)
+                        elif self.motion_type == motionType.amp_walk:
+                            if self.step == 2 and not self.fall_protection_latched:
+                                # Only queue here: inference and replay reset belong
+                                # to the control timer, outside the sensor lock.
+                                self._dance_prepare = {
+                                    'elapsed': 0.0,
+                                    'stable_time': 0.0,
+                                    'command': np.array([self.vx, self.vy, self.dyaw], dtype=np.float32),
+                                }
+                                print("B: slowing down before dance entry", flush=True)
+                        else:
+                            self.dance_flag = 1 - self.dance_flag
                                             
     def send_to_motor(self, dof_pos_target, kps, kds):
         dof_pos_target = np.asarray(dof_pos_target, dtype=np.float32)
@@ -700,9 +706,9 @@ class BxiExample(Node):
 
         # 切换过渡阶段：把新模型输出与之前捕获的旧模型输出按权重混合
         if self._blend_pending and self._old_action is not None and self.transition_active:
-            # t = min(1.0, max(0.0, (self.transition_step_count + 1) / max(1, self.transition_total_steps)))
-            # alpha = t * t * (3.0 - 2.0 * t)  # smoothstep: slow start, slow end
             alpha = min(1.0, max(0.0, (self.transition_step_count + 1) / max(1, self.transition_total_steps)))
+            if self._transition_smooth:
+                alpha = alpha * alpha * (3.0 - 2.0 * alpha)
             old_pos, old_kps, old_kds = self._old_action
             if old_pos.shape == dof_pos_target.shape:
                 dof_pos_target = (1.0 - alpha) * old_pos + alpha * dof_pos_target
@@ -711,6 +717,17 @@ class BxiExample(Node):
             if old_kds.shape == kds.shape:
                 kds = (1.0 - alpha) * old_kds + alpha * kds
             self._blend_pending = False  # 每个 tick 仅混合一次
+
+        if self._dance_hold_frame and self.motion_type == motionType.dance_mimic:
+            # Each policy observes the target actually applied by the blended
+            # controller, rather than its own unexecuted full-strength action.
+            self.dance_mimic.set_previous_target(dof_pos_target)
+            amp_delta = (dof_pos_target - self.amp_walk.default_dof_pos)[self.amp_walk.mujoco_to_isaac_idx]
+            self.amp_walk.last_action = np.divide(
+                amp_delta, self.amp_walk.action_scale,
+                out=np.zeros_like(amp_delta), where=np.abs(self.amp_walk.action_scale) > 1e-8,
+            )
+        self._last_motor_target = dof_pos_target.copy()
 
         msg = bxiMsg.ActuatorCmds()
         msg.header.frame_id = robot_name
@@ -857,6 +874,9 @@ class BxiExample(Node):
                     "Fall protection latched: motion output stopped, "
                     "heartbeat active; press Y to get up."
                 )
+
+            with self.lock_in:
+                cmd_vel = self._update_dance_entry(dq, quat, omega, cmd_vel)
                             
             # 状态机
             if self.state==robotState.stand:
@@ -869,34 +889,37 @@ class BxiExample(Node):
 
 
             elif self.state==robotState.motion:
-                # --- 模型切换平滑过渡（双模型加权） ---
-                if self.transition_active and self.prev_motion_type is not None \
-                        and self.prev_motion_type != self.motion_type:
-                    self._capture_motor = True
-                    self._captured = None
-                    _saved_mt = self.motion_type
-                    self.motion_type = self.prev_motion_type
-                    try:
-                        self._run_motion_dispatch(q, dq, quat, omega, cmd_vel)
-                    finally:
-                        self.motion_type = _saved_mt
-                        self._capture_motor = False
-                    self._old_action = self._captured
-                    self._blend_pending = self._old_action is not None
-                else:
-                    self._blend_pending = False
-                    self._old_action = None
-
-                self._run_motion_dispatch(q, dq, quat, omega, cmd_vel)
-
-                # 推进过渡进度
-                if self.transition_active:
-                    self.transition_step_count += 1
-                    if self.transition_step_count >= self.transition_total_steps:
-                        self.transition_active = False
-                        self.prev_motion_type = None
+                # Keep the temporary old-motion dispatch invisible to button
+                # callbacks; otherwise A/B can act on the wrong motion type.
+                with self.lock_in:
+                    if self.transition_active and self.prev_motion_type is not None \
+                            and self.prev_motion_type != self.motion_type:
+                        self._capture_motor = True
+                        self._captured = None
+                        _saved_mt = self.motion_type
+                        self.motion_type = self.prev_motion_type
+                        try:
+                            self._run_motion_dispatch(q, dq, quat, omega, cmd_vel)
+                        finally:
+                            self.motion_type = _saved_mt
+                            self._capture_motor = False
+                        self._old_action = self._captured
+                        self._blend_pending = self._old_action is not None
+                    else:
+                        self._blend_pending = False
                         self._old_action = None
-                        print(f"motion transition finished -> {self.motion_type}")
+
+                    self._run_motion_dispatch(q, dq, quat, omega, cmd_vel)
+
+                    # 推进过渡进度
+                    if self.transition_active:
+                        self.transition_step_count += 1
+                        if self.transition_step_count >= self.transition_total_steps:
+                            self.transition_active = False
+                            self.prev_motion_type = None
+                            self._old_action = None
+                            self._dance_hold_frame = False
+                            print(f"motion transition finished -> {self.motion_type}")
 
             elif self.state==robotState.motion_to_stand:
                 #站立过渡
@@ -909,11 +932,60 @@ class BxiExample(Node):
 
         self.loop_count += 1
       
-    def start_motion_transition(self, prev_motion_type, transition_time=None):
+    def _cancel_dance_entry(self):
+        self._dance_prepare = None
+        self._dance_hold_frame = False
+
+    def _update_dance_entry(self, dq, quat, omega, cmd_vel):
+        """Decelerate under AMP, then let the dance policy take over its first frame."""
+        if self._dance_hold_frame:
+            # The outgoing AMP policy must also see zero velocity throughout
+            # the blend, even when the operator keeps the stick deflected.
+            return np.zeros(3, dtype=np.float32)
+        prepare = self._dance_prepare
+        if prepare is None:
+            return cmd_vel
+        if self.motion_type != motionType.amp_walk or self.fall_protection_latched:
+            self._cancel_dance_entry()
+            return cmd_vel
+
+        prepare['elapsed'] += self.dt
+        progress = min(1.0, prepare['elapsed'] / max(self.dt, self.dance_stop_time))
+        weight = progress * progress * (3.0 - 2.0 * progress)
+        command = (1.0 - weight) * prepare['command']
+
+        quat_norm = float(np.linalg.norm(quat))
+        valid = (np.shape(dq) == (dof_num,) and np.shape(omega) == (3,) and np.shape(quat) == (4,)
+                 and np.all(np.isfinite(dq)) and np.all(np.isfinite(omega))
+                 and np.all(np.isfinite(quat)) and quat_norm > .5)
+        upright = (valid and float(get_gravity_orientation(quat / quat_norm)[2]) < -math.cos(.15))
+        stable = (progress >= 1.0 and upright
+                  and float(np.linalg.norm(omega)) < .35
+                  and float(np.max(np.abs(dq[3:15]))) < 1.0)
+        prepare['stable_time'] = prepare['stable_time'] + self.dt if stable else 0.0
+        if stable and prepare['stable_time'] + 1e-9 >= self.dance_settle_time:
+            self.dance_mimic.reset()
+            if self._last_motor_target is not None:
+                self.dance_mimic.set_previous_target(self._last_motor_target)
+            self.dance_flag = 1
+            self._dance_prepare = None
+            self.motion_type = motionType.dance_mimic
+            self.start_motion_transition(
+                motionType.amp_walk, transition_time=self.dance_transition_time, smooth=True,
+            )
+            self._dance_hold_frame = self.transition_active
+            print(f"B: standing stable after {prepare['elapsed']:.2f}s, blending into dance first frame", flush=True)
+        elif prepare['elapsed'] >= self.dance_settle_timeout:
+            self._cancel_dance_entry()
+            self.get_logger().warning("Dance entry cancelled: robot did not settle; release the stick and retry B")
+        return command
+
+    def start_motion_transition(self, prev_motion_type, transition_time=None, smooth=False):
         """启动从 prev_motion_type 到当前 self.motion_type 的混合过渡。"""
         if prev_motion_type is None or prev_motion_type == self.motion_type:
             return
         duration = self.transition_duration if transition_time is None else float(transition_time)
+        self._transition_smooth = smooth
         if duration <= 0:
             # 显式关闭过渡时必须清理旧过渡状态；否则上一次起身/躺下
             # 的 transition_active 可能继续把动作切换逻辑卡住。
@@ -1093,6 +1165,17 @@ class BxiExample(Node):
         # self.declare_parameter('/transition_time', 0.5)
         # self.declare_parameter('/transition_time', 0.6)
         self._param_transition_time = float(self.get_parameter('/transition_time').value)
+        # B-key dance entry has its own timing; other motion switches retain
+        # the existing /transition_time behaviour.
+        for name, default in (
+            ('dance_stop_time', .3), ('dance_settle_time', .12),
+            ('dance_settle_timeout', 3.0), ('dance_transition_time', .6),
+        ):
+            self.declare_parameter('/' + name, default)
+            value = float(self.get_parameter('/' + name).value)
+            if not math.isfinite(value) or value < 0.0:
+                raise ValueError(f'{name} must be finite and nonnegative')
+            setattr(self, name, value)
         self.declare_parameter('/depth_walk_enabled', False)
         self.depth_walk_enabled = bool(self.get_parameter('/depth_walk_enabled').value)
         self.declare_parameter('/depth_walk_mode', 'origin_camera')
@@ -1191,6 +1274,16 @@ class BxiExample(Node):
         self._captured = None
         self._old_action = None
         self._blend_pending = False
+        self._transition_smooth = False
+
+        self._dance_prepare = None
+        self._dance_hold_frame = False
+        self._last_motor_target = None
+        # Defaults also support controller-only tests without a ROS node.
+        self.dance_stop_time = getattr(self, 'dance_stop_time', .3)
+        self.dance_settle_time = getattr(self, 'dance_settle_time', .12)
+        self.dance_settle_timeout = getattr(self, 'dance_settle_timeout', 3.0)
+        self.dance_transition_time = getattr(self, 'dance_transition_time', .6)
 
         # 跌倒保护：走路/跑步时一旦检测到倒地就锁存，停止发布电机指令，
         # 只有 Y 键触发起身后才解除。

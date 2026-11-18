@@ -56,9 +56,11 @@ class HumanoidGaitDepthPolicy:
         if self.crop_rows is not None:
             if (not origin or len(self.crop_rows) != 2
                     or any(isinstance(row, bool) or not isinstance(row, (int, np.integer)) for row in self.crop_rows)
-                    or not 0 <= self.crop_rows[0] < self.crop_rows[1] <= 48
-                    or self.crop_rows[1]-self.crop_rows[0] != 36):
-                raise ValueError('origin_camera crop_rows must select 36 rows within [0,48)')
+                    or not 0 <= self.crop_rows[0] < self.crop_rows[1] <= 48):
+                raise ValueError('origin_camera crop_rows must select nonempty integer rows within [0,48)')
+            # The receiver still provides a 48 x 36 image after undoing its
+            # rotation. Models can consume different row crops without resize.
+            self.depth_shape = (self.crop_rows[1] - self.crop_rows[0], 36)
         self.depth_indices = np.array([-1] if origin else [-36, -31, -26, -21, -16, -11, -6, -1])
         self.depth_history_length = 1 if origin else 37
         self.command_lower = np.array([0., -.5 if origin else 0., -1.57])
@@ -91,7 +93,10 @@ class HumanoidGaitDepthPolicy:
         self.obs_input, self.depth_input = "obs_history", "depth_data"
         expected = list(self.depth_shape) if self.mode == "origin_camera" else [8, *self.depth_shape]
         if by_name[self.depth_input].shape[1:] != expected:
-            raise ValueError(f"Depth ONNX shape does not match mode {self.mode}")
+            raise ValueError(
+                f"Depth ONNX depth_data shape {by_name[self.depth_input].shape[1:]} does not match "
+                f"preprocessed shape {expected} for mode {self.mode} (crop_rows={self.crop_rows})"
+            )
         if any(item.type != "tensor(float)" for item in inputs):
             raise ValueError("Depth ONNX inputs must be float32")
         output_map = {item.name: item for item in outputs}

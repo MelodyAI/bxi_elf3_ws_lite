@@ -4,6 +4,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 import json
 
 from bxi_example_py_elf3.model_config import (
@@ -18,7 +19,13 @@ def generate_launch_description():
     
     npz_file_dict, onnx_file_dict = get_model_file_dicts()
 
-    actions = make_pico_launch_actions()
+    dance_defaults = {
+        'dance_stop_time': '.3', 'dance_settle_time': '.12',
+        'dance_settle_timeout': '3.0', 'dance_transition_time': '.6',
+    }
+    actions = [DeclareLaunchArgument(name, default_value=value)
+               for name, value in dance_defaults.items()]
+    actions.extend(make_pico_launch_actions())
     actions.extend([
             Node(
                 package="mujoco",
@@ -38,6 +45,8 @@ def generate_launch_description():
                 output="screen",
                 parameters=[
                     {"/topic_prefix": "simulation/"},
+                    {'/' + name: ParameterValue(LaunchConfiguration(name), value_type=float)
+                     for name in dance_defaults},
                     {"/use_hardware": False},
                     {"/rgmt_reference_mode": RGMT_REFERENCE_MODE},
                     {"/pico_pose_endpoint": PICO_POSE_ENDPOINT},

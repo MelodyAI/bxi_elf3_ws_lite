@@ -77,7 +77,7 @@ cd bxi_elf3_ws
 
 rm -rf ./build/ ./install/ ./log/
 
-source /opt/bxi/bxi_ros2_pkg/setup.bash
+source bxi_ros_pkg/setup.bash
 
 colcon build
 ```
@@ -88,7 +88,7 @@ colcon build
 ```bash
 sudo killall remote_controll
 cd bxi_elf3_ws
-source /opt/bxi/bxi_ros2_pkg/setup.bash
+source bxi_ros_pkg/setup.bash
 source install/setup.bash
 ros2 launch remote_controller remote_conroller_launch.py 
 ```
@@ -128,7 +128,7 @@ python3 src/bxi_example_py_elf3/test_neural_retarget_accad.py \
 
 ```bash
 cd /home/szz/bxi/bxi_elf3_ws_lite
-source /opt/bxi/bxi_ros2_pkg/setup.bash
+source bxi_ros_pkg/setup.bash
 source install/local_setup.bash
 ros2 launch bxi_example_py_elf3 example_dance.launch.py
 ```

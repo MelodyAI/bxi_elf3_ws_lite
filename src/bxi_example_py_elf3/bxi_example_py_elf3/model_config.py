@@ -23,7 +23,9 @@ PICO_UMR_PREDICTION_TIME_S = float(os.environ.get("PICO_UMR_PREDICTION_TIME_S", 
 # 仿真／真机 B 键：深度行走；A 键回普通 AMP，B 再按一次也可退出。
 # DEPTH_WALK_ENABLED = True
 DEPTH_WALK_ENABLED = False
-DEPTH_WALK_MODEL = "g1_25"  # origin_camera；相机位姿和输入约定一起选择
+# DEPTH_WALK_MODEL = "g1_25"  # origin_camera；相机位姿和输入约定一起选择
+# DEPTH_WALK_MODEL = "3624"  # origin_camera；相机位姿和输入约定一起选择
+DEPTH_WALK_MODEL = "3624_final"  # origin_camera；相机位姿和输入约定一起选择
 # 模型、图像契约与位姿一起选择。相机沿局部-Z看，生成器将视线俯角转换为四元数。
 DEPTH_WALK_PROFILES = {
     "dagger2": {
@@ -38,6 +40,14 @@ DEPTH_WALK_PROFILES = {
     "g1_25": {
         "mode": "origin_camera", "position": (0.08599, 0.0175, -0.20651), "look_down_deg": 65.0,
         "preprocess": {"crop_rows": (12, 48), "depth_range": (0.2, 2.0)},
+    },
+    "3624": {
+        "mode": "origin_camera", "position": (0.08599, 0.0175, -0.20651), "look_down_deg": 65.0,
+        "preprocess": {"crop_rows": (24, 48), "depth_range": (0.2, 2.0)},
+    },
+    "3624_final": {
+        "mode": "origin_camera", "position": (0.08599, 0.0175, -0.20651), "look_down_deg": 65.0,
+        "preprocess": {"crop_rows": (24, 48), "depth_range": (0.2, 2.0)},
     },
 }
 DEPTH_WALK_MODE = DEPTH_WALK_PROFILES[DEPTH_WALK_MODEL]["mode"]
@@ -106,7 +116,8 @@ ONNX_FILE_PATHS = {
     # "rgmt": "policy/rgmtr_38000.onnx",
     # "rgmt": "policy/rgmtr_13800.onnx",
     # "rgmt": "policy/rgmtr_33000.onnx",
-    "rgmt": "policy/rgmtr_54400.onnx",
+    # "rgmt": "policy/rgmtr_54400.onnx",
+    "rgmt": "policy/rgmtr_63600.onnx",
 
     
     "neural_retarget": "policy/neural_retarget_fast.onnx",
@@ -117,7 +128,9 @@ ONNX_FILE_PATHS = {
     "getup_back": "policy/dance_isaaclab/getup_back.onnx",
     
     # "mimic": "policy/dance_isaaclab/old_face1_v1_18k.onnx",
-    "mimic": "policy/dance_isaaclab/old_face2_v1_6k.onnx",
+    # "mimic": "policy/dance_isaaclab/old_face2_v1_6k.onnx",
+    # "mimic": "policy/dance_isaaclab/old_face2_v1_9k.onnx",
+    "mimic": "policy/dance_isaaclab/hzm.onnx",
 }
 
 NPZ_FILE_PATHS = {
@@ -128,7 +141,8 @@ NPZ_FILE_PATHS = {
     "getup_back": "policy/dance_isaaclab/getup_back.npz",
     
     # "mimic": "policy/dance_isaaclab/old_face1.npz",
-    "mimic": "policy/dance_isaaclab/old_face2.npz",
+    # "mimic": "policy/dance_isaaclab/old_face2.npz",
+    "mimic": "policy/dance_isaaclab/hzm.npz",
 
     # UMR 原始动作输入：选一个 NPZ/BVH 文件，无需预先转换。
     "umr": "policy/lafan1_orin/dance1_subject2.bvh",
@@ -152,7 +166,7 @@ NPZ_FILE_PATHS = {
     # "rgmt": "policy/lafan1_npz/ground1_subject1.npz",
     # "rgmt": "policy/lafan1_npz/fightAndSports1_subject1.npz",
     # "rgmt": "policy/lafan1_npz/aiming1_subject1.npz",
-    # "rgmt": "policy/lafan1_npz/multipleActions1_subject1.npz",
+    "rgmt": "policy/lafan1_npz/multipleActions1_subject1.npz",
     # "rgmt": "policy/lafan1_npz/fallAndGetUp1_subject4.npz",
     # "rgmt": "policy/lafan1_npz/aiming1_subject1.npz",
     # "rgmt": "policy/lafan1_npz/run1_subject2.npz",
@@ -160,7 +174,7 @@ NPZ_FILE_PATHS = {
     # "rgmt": "policy/dance_isaaclab/pico_fix_fix_fix_final.npz",
     # "rgmt": "policy/lafan1_npz/run1_subject5.npz",
     # "rgmt": "policy/lafan1_npz/walk1_subject2.npz",
-    "rgmt": "policy/lafan1_npz/dance1_subject2.npz",
+    # "rgmt": "policy/lafan1_npz/dance1_subject2.npz",
     # "rgmt": "policy/lafan1_npz/walk1_subject5.npz",
 
     #cmu
@@ -176,7 +190,7 @@ NPZ_FILE_PATHS = {
     # "rgmt": "policy/cmu_1h_new/85/85_06_stageii.npz",    #街舞-韦伯斯特
     # "rgmt": "policy/cmu_1h_new/85/85_07_stageii.npz",    #街舞-后脚翻
     # "rgmt": "policy/cmu_1h_new/85/85_08_stageii.npz",    #街舞-托马斯
-    # "rgmt": "policy/cmu_1h_new/85/85_09_stageii.npz",    #马步
+    # "rgmt": "policy/cmu_1h_new/85/85_09_stageii.npz",    #马步 bad
     # "rgmt": "policy/cmu_1h_new/85/85_10_stageii.npz",    #bad?
     # "rgmt": "policy/cmu_1h_new/85/85_11_stageii.npz",    #街舞#
     # "rgmt": "policy/cmu_1h_new/85/85_12_stageii.npz",    #街舞-hard
@@ -185,7 +199,7 @@ NPZ_FILE_PATHS = {
     
     # "rgmt": "policy/cmu_1h_new/87/87_01_stageii.npz",    #慢速？
     
-    # "rgmt": "policy/cmu_1h_new/88/88_03_stageii.npz",    #马步
+    # "rgmt": "policy/cmu_1h_new/88/88_03_stageii.npz",    #马步 bad
     # "rgmt": "policy/cmu_1h_new/88/88_05_stageii.npz",    #bad
     # "rgmt": "policy/cmu_1h_new/88/88_06_stageii.npz",    #旋转踢#
     # "rgmt": "policy/cmu_1h_new/88/88_07_stageii.npz",    #侧倒立

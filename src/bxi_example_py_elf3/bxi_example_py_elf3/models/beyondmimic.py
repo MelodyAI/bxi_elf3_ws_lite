@@ -931,6 +931,26 @@ class DanceMotionPolicyGravityIsaaclabV3:
         self.action_buffer = np.zeros((self.num_actions,), dtype=np.float32)
         self.history_buffers = {}
 
+    def reset(self, start_frame=None):
+        """Reset replay and observation history using the training reset convention.
+
+        push_history repeats the first real observation to fill each history.
+        Do not recursively infer actions against an unchanged observation.
+        """
+        frame = self.start_frame if start_frame is None else int(start_frame)
+        self.timestep = int(np.clip(frame, 0, self.end_frame))
+        self.timeinit = 0.0
+        self.action_buffer.fill(0.0)
+        self.history_buffers.clear()
+
+    def set_previous_target(self, target_mujoco):
+        """Express the executed joint target in this policy's residual action space."""
+        target_isaac = np.asarray(target_mujoco, dtype=np.float32)[self.mujoco_to_isaac_idx]
+        self.action_buffer = np.divide(
+            target_isaac - self.default_joint_pos_isaac, self.action_scale,
+            out=np.zeros_like(self.action_buffer), where=np.abs(self.action_scale) > 1e-8,
+        )
+
     def initialize_model(self, npz_path, onnx_path):
         self.motion = np.load(npz_path)
         self.motionpos = self.motion["body_pos_w"]

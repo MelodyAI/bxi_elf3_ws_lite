@@ -89,7 +89,8 @@ try:
     np.save(out/'policy_depth.npy', policy.depth_input_buffer)
     np.save(out/'targets.npy', np.asarray(targets))
     assert np.isfinite(targets).all()
-    assert policy.depth_input_buffer.shape[1:] == ((36,36) if DEPTH_WALK_MODE == 'origin_camera' else (8,21,32))
+    expected_depth_shape = policy.depth_shape if DEPTH_WALK_MODE == 'origin_camera' else (8, *policy.depth_shape)
+    assert policy.depth_input_buffer.shape[1:] == expected_depth_shape
     hz = (len(samples)-1)/(samples[-1][0]-samples[0][0])
     target_hz = int(DEPTH_CAMERA_STREAM['fps'])
     assert hz >= target_hz*.9, f'Camera below 90% of configured {target_hz} Hz: {hz:g}'

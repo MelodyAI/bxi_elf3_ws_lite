@@ -156,6 +156,45 @@ def test_recurrent_preview_reset_command_clamping_and_joint_order():
     np.testing.assert_array_equal(policy.last_action, 0.)
 
 
+@pytest.mark.parametrize('filename,crop_rows,shape', [
+    ('g1_25.onnx', (12, 48), (36, 36)),
+    ('3624.onnx', (24, 48), (24, 36)),
+])
+def test_model_row_crop_preserves_pixels_and_runs_real_onnx(filename, crop_rows, shape):
+    import cv2
+    policy = HumanoidGaitDepthPolicy(
+        PACKAGE / 'policy/depth_walk' / filename, crop_rows=crop_rows, depth_range=(.2, 2.),
+    )
+    # Use a spatially varying image to detect an incorrect rotation, crop or resize.
+    image = np.linspace(0., 2.5, 48 * 36, dtype=np.float32).reshape(48, 36)
+    image[::3, ::4] = .3
+    received = np.rot90(image, k=-1)
+    blurred = cv2.GaussianBlur(image, (3, 3), 1., borderType=cv2.BORDER_REFLECT_101)
+    expected = ((np.clip(blurred, .2, 2.) - .2) / 1.8 - .5)[crop_rows[0]:crop_rows[1]]
+    np.testing.assert_allclose(policy.preprocess_depth(received), expected, atol=2e-7)
+    for frame in range(5):
+        target = policy.inference_step(policy.default_dof_pos, np.zeros(29), [1., 0., 0., 0.],
+                                       np.zeros(3), [.2, 0., 0.], received, frame)
+        assert target.shape == (29,) and np.isfinite(target).all()
+    assert policy.depth_shape == shape
+    assert policy.depth_input_buffer.shape == (1, *shape)
+    np.testing.assert_allclose(policy.depth_input_buffer[0], expected, atol=2e-7)
+
+
+@pytest.mark.parametrize('filename,crop_rows', [
+    ('g1_25.onnx', (24, 48)), ('3624.onnx', (12, 48)),
+])
+def test_row_crop_must_match_model_input_shape(filename, crop_rows):
+    with pytest.raises(ValueError, match='depth_data shape .* preprocessed shape'):
+        HumanoidGaitDepthPolicy(PACKAGE / 'policy/depth_walk' / filename, crop_rows=crop_rows)
+
+
+@pytest.mark.parametrize('crop_rows', [(24, 24), (-1, 23), (24, 49), (24., 48), (True, 25)])
+def test_invalid_crop_rows_are_rejected(crop_rows):
+    with pytest.raises(ValueError, match='crop_rows must select nonempty integer rows'):
+        HumanoidGaitDepthPolicy(PACKAGE / 'policy/depth_walk/3624.onnx', crop_rows=crop_rows)
+
+
 def scene_config(profile='dagger_new_position'):
     from bxi_example_py_elf3 import model_config as config
     settings = config.DEPTH_WALK_PROFILES[profile]
@@ -191,6 +230,7 @@ def test_generated_xml_preserves_physics_and_camera_mount(tmp_path, profile, ang
 
 def test_config_controls_generated_scene_and_disabled_depth(tmp_path, monkeypatch):
     from bxi_example_py_elf3 import model_config as config
+    monkeypatch.setattr(config, 'DEPTH_WALK_ENABLED', True)
     original = (PACKAGE / config.SIMULATION_MODEL_XML).read_bytes()
     first = config.get_simulation_model_file(package_share_dir=PACKAGE, output_dir=tmp_path)
     assert first == config.get_simulation_model_file(package_share_dir=PACKAGE, output_dir=tmp_path)
